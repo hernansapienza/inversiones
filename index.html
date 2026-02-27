@@ -474,141 +474,224 @@ function showTab(btn,id){
   if(id==='t-cartera'&&!carteraLoaded){carteraLoaded=true;loadPrices();}
 }
 
-// LIVE PRICES
-var liveP={};
-var mepVal=null;
 
-function setStatus(state,txt){
-  var d=el('cdot'), l=el('ctxt');
-  if(d) d.className='dot'+(state?' '+state:'');
-  if(l) l.textContent=txt;
+// LIVE PRICES
+var liveP = {};
+var mepVal = null;
+
+function setStatus(state, txt) {
+  var d = el('cdot'), l = el('ctxt');
+  if (d) d.className = 'dot' + (state ? ' ' + state : '');
+  if (l) l.textContent = txt;
 }
 
-function loadPrices(){
-  liveP={};
-  setStatus('spin','Consultando tipo de cambio MEP...');
+// Fetch JSON through multiple CORS proxies with fallback
+function proxyFetch(url) {
+  var proxies = [
+    'https://api.allorigins.win/get?url=',
+    'https://corsproxy.io/?',
+    'https://api.codetabs.com/v1/proxy?quest='
+  ];
+  function tryProxy(i) {
+    if (i >= proxies.length) return Promise.reject(new Error('All proxies failed for: ' + url));
+    var proxyUrl = proxies[i] + encodeURIComponent(url);
+    return fetch(proxyUrl, {signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined})
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(data) {
+        // allorigins wraps in {contents:...}, others return directly
+        var body = data.contents !== undefined ? JSON.parse(data.contents) : data;
+        return body;
+      })
+      .catch(function(e) {
+        console.warn('Proxy ' + i + ' failed (' + proxies[i] + '):', e.message);
+        return tryProxy(i + 1);
+      });
+  }
+  return tryProxy(0);
+}
 
-  var p1=fetch('https://dolarito.ar/api/v2/mep')
-    .then(function(r){return r.json();})
-    .then(function(j){
-      var v=j.sell||j.buy||j.price||(j.data&&(j.data.sell||j.data.venta))||null;
-      return v?parseFloat(v):null;
-    })
-    .catch(function(){return null;});
+function loadPrices() {
+  liveP = {};
+  setStatus('spin', 'Consultando tipo de cambio MEP...');
 
-  var p2=fetch('https://api.bluelytics.com.ar/v2/latest')
-    .then(function(r){return r.json();})
-    .then(function(j){return j.oficial&&j.oficial.value_sell?parseFloat(j.oficial.value_sell):null;})
-    .catch(function(){return null;});
+  // MEP: try two sources
+  var mepUrls = [
+    'https://dolarito.ar/api/v2/mep',
+    'https://api.bluelytics.com.ar/v2/latest'
+  ];
 
-  Promise.all([p1,p2]).then(function(res){
-    mepVal=res[0]||res[1]||1450;
-    setStatus('spin','MEP $'+Math.round(mepVal)+' — consultando Yahoo Finance...');
+  function parseMep(url, data) {
+    if (url.includes('dolarito')) {
+      return data.sell || data.buy || data.price || (data.data && (data.data.sell || data.data.venta)) || null;
+    }
+    return data.oficial && data.oficial.value_sell ? data.oficial.value_sell : null;
+  }
 
-    var yahooList=[];
-    HELD.forEach(function(r){var m=TMAP[r.ticker];if(m&&m.yahoo)yahooList.push(m.yahoo);});
+  function fetchMep(i) {
+    if (i >= mepUrls.length) return Promise.resolve(1450);
+    return fetch(mepUrls[i])
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var v = parseMep(mepUrls[i], data);
+        return v ? parseFloat(v) : fetchMep(i + 1);
+      })
+      .catch(function() { return fetchMep(i + 1); });
+  }
 
-    var bymaList=[];
-    HELD.forEach(function(r){var m=TMAP[r.ticker];if(m&&m.byma)bymaList.push({local:r.ticker,sym:m.byma});});
+  fetchMep(0).then(function(mep) {
+    mepVal = mep || 1450;
+    setStatus('spin', 'MEP $' + Math.round(mepVal) + ' — consultando precios...');
 
-    var yUrl='https://query1.finance.yahoo.com/v7/finance/quote?symbols='+encodeURIComponent(yahooList.join(','))+'&fields=regularMarketPrice';
-    var yProxy='https://api.allorigins.win/get?url='+encodeURIComponent(yUrl);
+    // Build lists
+    var yahooSymbols = [];
+    HELD.forEach(function(r) {
+      var m = TMAP[r.ticker];
+      if (m && m.yahoo) yahooSymbols.push(m.yahoo);
+      // Cost-priced assets: set immediately
+      if (m && (m.cat === 'on_usd' || m.cat === 'fondo') && r.cantidad > 0) {
+        liveP[r.ticker] = r.costo_usd / r.cantidad;
+      }
+    });
 
-    var pY=fetch(yProxy)
-      .then(function(r){return r.json();})
-      .then(function(raw){
-        var body=JSON.parse(raw.contents);
-        var out={};
-        ((body.quoteResponse&&body.quoteResponse.result)||[]).forEach(function(q){out[q.symbol]=q.regularMarketPrice;});
+    var bymaList = [];
+    HELD.forEach(function(r) {
+      var m = TMAP[r.ticker];
+      if (m && m.byma) bymaList.push({ local: r.ticker, sym: m.byma });
+    });
+
+    // Yahoo Finance
+    var yUrl = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols=' +
+               encodeURIComponent(yahooSymbols.join(',')) +
+               '&fields=regularMarketPrice&formatted=false';
+
+    var pY = proxyFetch(yUrl)
+      .then(function(body) {
+        var results = (body.quoteResponse && body.quoteResponse.result) || [];
+        console.log('[Yahoo] got', results.length, 'results');
+        var out = {};
+        results.forEach(function(q) {
+          out[q.symbol] = q.regularMarketPrice;
+          console.log('[Yahoo]', q.symbol, '=', q.regularMarketPrice, '-> USD', (q.regularMarketPrice / mepVal).toFixed(4));
+        });
         return out;
       })
-      .catch(function(e){console.warn('Yahoo:',e);return {};});
+      .catch(function(e) { console.error('[Yahoo] all proxies failed:', e.message); return {}; });
 
-    var pB=Promise.all(bymaList.map(function(item){
-      var bUrl='https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/bnown/securities/bonds?limit=10&page=0&q='+encodeURIComponent(item.sym);
-      var bProxy='https://api.allorigins.win/get?url='+encodeURIComponent(bUrl);
-      return fetch(bProxy)
-        .then(function(r){return r.json();})
-        .then(function(raw){
-          var body=JSON.parse(raw.contents);
-          var items=body.data||body.content||(Array.isArray(body)?body:[]);
-          var match=items.find(function(i){return(i.symbol||i.ticker||'').toUpperCase()===item.sym.toUpperCase();});
-          if(!match&&items.length>0)match=items[0];
-          if(match){var p=parseFloat(match.last||match.price||match.trade||0);if(p>0)liveP[item.local]=p;}
+    // BYMA bonds
+    var pB = Promise.all(bymaList.map(function(item) {
+      var bUrl = 'https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/bnown/securities/bonds?limit=20&page=0&q=' + encodeURIComponent(item.sym);
+      return proxyFetch(bUrl)
+        .then(function(body) {
+          var items = body.data || body.content || (Array.isArray(body) ? body : []);
+          var match = items.find(function(i) {
+            return (i.symbol || i.ticker || '').toUpperCase() === item.sym.toUpperCase();
+          });
+          if (!match && items.length > 0) match = items[0];
+          if (match) {
+            var p = parseFloat(match.last || match.price || match.trade || 0);
+            console.log('[BYMA]', item.sym, '=', p);
+            if (p > 0) liveP[item.local] = p;
+          } else {
+            console.warn('[BYMA] no match for', item.sym);
+          }
         })
-        .catch(function(e){console.warn('BYMA '+item.sym+':',e);});
+        .catch(function(e) { console.error('[BYMA]', item.sym, 'failed:', e.message); });
     }));
 
-    Promise.all([pY,pB]).then(function(res){
-      var yRes=res[0];
-      HELD.forEach(function(r){
-        var m=TMAP[r.ticker];
-        if(!m)return;
-        if(m.yahoo&&yRes[m.yahoo]) liveP[r.ticker]=yRes[m.yahoo]/mepVal;
-        if((m.cat==='on_usd'||m.cat==='fondo')&&r.cantidad>0) liveP[r.ticker]=r.costo_usd/r.cantidad;
+    Promise.all([pY, pB]).then(function(res) {
+      var yRes = res[0];
+      // Map yahoo ARS -> USD
+      HELD.forEach(function(r) {
+        var m = TMAP[r.ticker];
+        if (!m) return;
+        if (m.yahoo && yRes[m.yahoo] && yRes[m.yahoo] > 0) {
+          liveP[r.ticker] = yRes[m.yahoo] / mepVal;
+        }
       });
-      var n=Object.keys(liveP).length;
-      setStatus('ok','MEP $'+Math.round(mepVal)+' | '+n+'/28 precios obtenidos');
+
+      var n = Object.keys(liveP).length;
+      console.log('[liveP] total:', n, liveP);
+      setStatus('ok', 'MEP $' + Math.round(mepVal) + ' | ' + n + '/28 precios obtenidos');
       renderCartera();
     });
-  }).catch(function(e){setStatus('err','Error: '+e.message);});
+
+  }).catch(function(e) { setStatus('err', 'Error MEP: ' + e.message); });
 }
 
-function renderCartera(){
-  var rows=HELD.map(function(r){
-    var m=TMAP[r.ticker]||{};
-    var pMkt=liveP[r.ticker]||null;
-    var pCmp=r.cantidad>0?r.costo_usd/r.cantidad:0;
-    var vMkt=pMkt?pMkt*r.cantidad:null;
-    var rev=vMkt!==null?vMkt-r.costo_usd:null;
-    var revP=rev!==null&&r.costo_usd>0?rev/r.costo_usd*100:null;
-    var src=m.yahoo?'Yahoo/MEP':m.byma?'BYMA':'Costo';
-    return {r:r,pCmp:pCmp,pMkt:pMkt,vMkt:vMkt,rev:rev,revP:revP,src:src};
+function renderCartera() {
+  var totCst = 0, totMkt = 0, totRev = 0, nLive = 0;
+
+  var rows = HELD.map(function(r) {
+    var m      = TMAP[r.ticker] || {};
+    var pMkt   = liveP[r.ticker] || null;          // precio unitario en USD
+    var pCmp   = r.cantidad > 0 ? r.costo_usd / r.cantidad : 0;
+    var costo  = r.costo_usd;                       // lo que gasté
+    var vMkt   = pMkt !== null ? pMkt * r.cantidad : null;
+    var rev    = vMkt !== null ? vMkt - costo : null;
+    var revP   = rev !== null && costo > 0 ? rev / costo * 100 : null;
+    var src    = m.yahoo ? 'Yahoo/MEP' : m.byma ? 'BYMA' : 'Costo';
+    var isLive = pMkt !== null && src !== 'Costo';
+
+    totCst += costo;
+    totMkt += vMkt !== null ? vMkt : costo;
+    if (rev !== null) totRev += rev;
+    if (isLive) nLive++;
+
+    return { r: r, pCmp: pCmp, pMkt: pMkt, costo: costo, vMkt: vMkt, rev: rev, revP: revP, src: src, isLive: isLive };
   });
 
-  var totMkt=rows.reduce(function(s,x){return s+(x.vMkt||x.r.costo_usd);},0);
-  var totCst=rows.reduce(function(s,x){return s+x.r.costo_usd;},0);
-  var totRev=rows.reduce(function(s,x){return s+(x.rev||0);},0);
-  var nF=rows.filter(function(x){return x.pMkt&&x.src!=='Costo';}).length;
+  // Summary cards
+  el('cCst').textContent  = u2(totCst);
+  el('cMkt').textContent  = u2(totMkt);
+  var ep = el('cPnl');
+  if (ep) { ep.textContent = sgn(totRev); ep.className = 'kv ' + cls(totRev); }
+  el('cPnlP').textContent = (totCst > 0 ? pct(totRev / totCst * 100) : '—') + ' sobre costo';
+  el('cCob').textContent  = nLive + '/28';
 
-  set('cMkt',u2(totMkt));
-  set('cCst',u2(totCst));
-  var ep=el('cPnl');
-  if(ep){ep.textContent=sgn(totRev);ep.className='kv '+cls(totRev);}
-  set('cPnlP',(totCst>0?pct(totRev/totCst*100):'—')+' sobre costo');
-  set('cCob',nF+'/28');
+  // Update banner
+  var eRev = el('pb-rev');
+  if (eRev) { eRev.textContent = sgn(totRev); eRev.className = 'pb-val ' + cls(totRev); }
+  set('pb-rev-s', (totCst > 0 ? pct(totRev / totCst * 100) : '') + ' sobre costo de cartera');
+  var note = el('rev-note');
+  if (note) {
+    note.style.display = 'block';
+    note.textContent = '* Revalorizaci\u00f3n con ' + nLive + '/28 posiciones a precio de mercado. MEP: $' + Math.round(mepVal) + '. ONs y fondos valuados a costo.';
+  }
 
-  // Update P&L banner revalorizacion
-  var eRev=el('pb-rev');
-  if(eRev){eRev.textContent=sgn(totRev);eRev.className='pb-val '+cls(totRev);}
-  set('pb-rev-s', (totCst>0?pct(totRev/totCst*100):'')+' sobre costo de cartera');
-  var note=el('rev-note');
-  if(note){note.style.display='block';note.textContent='* Revalorización calculada con '+nF+' de 28 posiciones a precio de mercado. MEP utilizado: $'+Math.round(mepVal)+'.';}
+  // Sort by market value desc
+  rows.sort(function(a, b) { return (b.vMkt || b.costo) - (a.vMkt || a.costo); });
 
-  rows.sort(function(a,b){return(b.vMkt||b.r.costo_usd)-(a.vMkt||a.r.costo_usd);});
+  el('bCart').innerHTML = rows.map(function(x) {
+    var r  = x.r;
+    var pp = totMkt > 0 ? (((x.vMkt || x.costo) / totMkt) * 100).toFixed(1) : '0';
 
-  el('bCart').innerHTML=rows.map(function(x){
-    var r=x.r;
-    var pp=totMkt>0?(((x.vMkt||r.costo_usd)/totMkt)*100).toFixed(1):'0';
-    var mktCell=(x.pMkt&&x.src!=='Costo')?u2(x.pMkt):'<span style="color:var(--muted2)">@ costo</span>';
-    var revCell=x.rev!==null?'<span class="'+cls(x.rev)+'">'+sgn(x.rev)+'</span>':'—';
-    var revPCell=x.revP!==null?'<span class="'+cls(x.revP)+'">'+pct(x.revP)+'</span>':'—';
-    return '<tr>'+
-      '<td><b>'+r.ticker+'</b></td>'+
-      '<td style="max-width:170px;overflow:hidden;text-overflow:ellipsis;font-size:.67rem">'+r.desc+'</td>'+
-      '<td>'+badge(r.tipo)+'</td>'+
-      '<td class="r">'+r.cantidad.toFixed(0)+'</td>'+
-      '<td class="r">'+u2(x.pCmp)+'</td>'+
-      '<td class="r">'+mktCell+'</td>'+
-      '<td class="r">'+u2(r.costo_usd)+'</td>'+
-      '<td class="r neu"><b>'+u2(x.vMkt||r.costo_usd)+'</b></td>'+
-      '<td class="r">'+revCell+'</td>'+
-      '<td class="r">'+revPCell+'</td>'+
-      '<td class="r" style="color:var(--muted)">'+pp+'%</td>'+
-      '<td style="font-size:.6rem;color:var(--muted2)">'+x.src+'</td>'+
+    var mktCell = x.pMkt !== null && x.isLive
+      ? '<b>' + u2(x.pMkt) + '</b>'
+      : '<span style="color:var(--muted2)">@ costo</span>';
+
+    var revCell  = x.rev  !== null ? '<span class="' + cls(x.rev)  + '">' + sgn(x.rev)  + '</span>' : '\u2014';
+    var revPCell = x.revP !== null ? '<span class="' + cls(x.revP) + '">' + pct(x.revP) + '</span>' : '\u2014';
+
+    return '<tr>' +
+      '<td><b>' + r.ticker + '</b></td>' +
+      '<td style="max-width:170px;overflow:hidden;text-overflow:ellipsis;font-size:.67rem">' + r.desc + '</td>' +
+      '<td>' + badge(r.tipo) + '</td>' +
+      '<td class="r">' + r.cantidad.toFixed(0) + '</td>' +
+      '<td class="r">' + u2(x.pCmp) + '</td>' +
+      '<td class="r">' + mktCell + '</td>' +
+      '<td class="r">' + u2(x.costo) + '</td>' +
+      '<td class="r neu"><b>' + u2(x.vMkt !== null ? x.vMkt : x.costo) + '</b></td>' +
+      '<td class="r">' + revCell + '</td>' +
+      '<td class="r">' + revPCell + '</td>' +
+      '<td class="r" style="color:var(--muted)">' + pp + '%</td>' +
+      '<td style="font-size:.6rem;color:var(--muted2)">' + x.src + '</td>' +
     '</tr>';
   }).join('');
 }
+
 
 rTick();
 rTrades();
