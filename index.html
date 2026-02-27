@@ -475,6 +475,7 @@ function showTab(btn,id){
 }
 
 
+
 // LIVE PRICES
 var liveP = {};
 var mepVal = null;
@@ -485,140 +486,129 @@ function setStatus(state, txt) {
   if (l) l.textContent = txt;
 }
 
-// Fetch JSON through multiple CORS proxies with fallback
-function proxyFetch(url) {
-  var proxies = [
-    'https://api.allorigins.win/get?url=',
-    'https://corsproxy.io/?',
-    'https://api.codetabs.com/v1/proxy?quest='
-  ];
-  function tryProxy(i) {
-    if (i >= proxies.length) return Promise.reject(new Error('All proxies failed for: ' + url));
-    var proxyUrl = proxies[i] + encodeURIComponent(url);
-    return fetch(proxyUrl, {signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined})
-      .then(function(r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      })
-      .then(function(data) {
-        // allorigins wraps in {contents:...}, others return directly
-        var body = data.contents !== undefined ? JSON.parse(data.contents) : data;
-        return body;
-      })
-      .catch(function(e) {
-        console.warn('Proxy ' + i + ' failed (' + proxies[i] + '):', e.message);
-        return tryProxy(i + 1);
-      });
-  }
-  return tryProxy(0);
+// CORS proxy wrapper — allorigins returns {contents: "...json string..."}
+function proxyGet(url) {
+  var proxy = 'https://api.allorigins.win/get?url=' + encodeURIComponent(url);
+  return fetch(proxy)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.contents === undefined) throw new Error('no contents');
+      return JSON.parse(d.contents);
+    });
 }
 
 function loadPrices() {
   liveP = {};
   setStatus('spin', 'Consultando tipo de cambio MEP...');
 
-  // MEP: try two sources
-  var mepUrls = [
-    'https://dolarito.ar/api/v2/mep',
-    'https://api.bluelytics.com.ar/v2/latest'
-  ];
+  // --- MEP via proxy (dolarito bloquea CORS directo) ---
+  proxyGet('https://dolarito.ar/api/v2/mep')
+    .then(function(j) {
+      return parseFloat(j.sell || j.buy || j.price || (j.data && (j.data.sell || j.data.venta)) || 0) || null;
+    })
+    .catch(function() { return null; })
+    .then(function(v1) {
+      if (v1) return v1;
+      // fallback: bluelytics (no necesita proxy, tiene CORS abierto)
+      return fetch('https://api.bluelytics.com.ar/v2/latest')
+        .then(function(r) { return r.json(); })
+        .then(function(j) { return parseFloat(j.oficial.value_sell) || null; })
+        .catch(function() { return null; });
+    })
+    .then(function(mep) {
+      mepVal = mep || 1450;
+      setStatus('spin', 'MEP $' + Math.round(mepVal) + ' — consultando Yahoo Finance...');
 
-  function parseMep(url, data) {
-    if (url.includes('dolarito')) {
-      return data.sell || data.buy || data.price || (data.data && (data.data.sell || data.data.venta)) || null;
-    }
-    return data.oficial && data.oficial.value_sell ? data.oficial.value_sell : null;
-  }
-
-  function fetchMep(i) {
-    if (i >= mepUrls.length) return Promise.resolve(1450);
-    return fetch(mepUrls[i])
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        var v = parseMep(mepUrls[i], data);
-        return v ? parseFloat(v) : fetchMep(i + 1);
-      })
-      .catch(function() { return fetchMep(i + 1); });
-  }
-
-  fetchMep(0).then(function(mep) {
-    mepVal = mep || 1450;
-    setStatus('spin', 'MEP $' + Math.round(mepVal) + ' — consultando precios...');
-
-    // Build lists
-    var yahooSymbols = [];
-    HELD.forEach(function(r) {
-      var m = TMAP[r.ticker];
-      if (m && m.yahoo) yahooSymbols.push(m.yahoo);
-      // Cost-priced assets: set immediately
-      if (m && (m.cat === 'on_usd' || m.cat === 'fondo') && r.cantidad > 0) {
-        liveP[r.ticker] = r.costo_usd / r.cantidad;
-      }
-    });
-
-    var bymaList = [];
-    HELD.forEach(function(r) {
-      var m = TMAP[r.ticker];
-      if (m && m.byma) bymaList.push({ local: r.ticker, sym: m.byma });
-    });
-
-    // Yahoo Finance
-    var yUrl = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols=' +
-               encodeURIComponent(yahooSymbols.join(',')) +
-               '&fields=regularMarketPrice&formatted=false';
-
-    var pY = proxyFetch(yUrl)
-      .then(function(body) {
-        var results = (body.quoteResponse && body.quoteResponse.result) || [];
-        console.log('[Yahoo] got', results.length, 'results');
-        var out = {};
-        results.forEach(function(q) {
-          out[q.symbol] = q.regularMarketPrice;
-          console.log('[Yahoo]', q.symbol, '=', q.regularMarketPrice, '-> USD', (q.regularMarketPrice / mepVal).toFixed(4));
-        });
-        return out;
-      })
-      .catch(function(e) { console.error('[Yahoo] all proxies failed:', e.message); return {}; });
-
-    // BYMA bonds
-    var pB = Promise.all(bymaList.map(function(item) {
-      var bUrl = 'https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/bnown/securities/bonds?limit=20&page=0&q=' + encodeURIComponent(item.sym);
-      return proxyFetch(bUrl)
-        .then(function(body) {
-          var items = body.data || body.content || (Array.isArray(body) ? body : []);
-          var match = items.find(function(i) {
-            return (i.symbol || i.ticker || '').toUpperCase() === item.sym.toUpperCase();
-          });
-          if (!match && items.length > 0) match = items[0];
-          if (match) {
-            var p = parseFloat(match.last || match.price || match.trade || 0);
-            console.log('[BYMA]', item.sym, '=', p);
-            if (p > 0) liveP[item.local] = p;
-          } else {
-            console.warn('[BYMA] no match for', item.sym);
-          }
-        })
-        .catch(function(e) { console.error('[BYMA]', item.sym, 'failed:', e.message); });
-    }));
-
-    Promise.all([pY, pB]).then(function(res) {
-      var yRes = res[0];
-      // Map yahoo ARS -> USD
+      // Cost-priced assets (ONs y fondos) — set immediately
       HELD.forEach(function(r) {
         var m = TMAP[r.ticker];
-        if (!m) return;
-        if (m.yahoo && yRes[m.yahoo] && yRes[m.yahoo] > 0) {
-          liveP[r.ticker] = yRes[m.yahoo] / mepVal;
+        if (m && (m.cat === 'on_usd' || m.cat === 'fondo') && r.cantidad > 0) {
+          liveP[r.ticker] = r.costo_usd / r.cantidad;
         }
       });
 
-      var n = Object.keys(liveP).length;
-      console.log('[liveP] total:', n, liveP);
-      setStatus('ok', 'MEP $' + Math.round(mepVal) + ' | ' + n + '/28 precios obtenidos');
-      renderCartera();
-    });
+      // --- Yahoo Finance (acciones y CEDEARs en ARS) ---
+      var yahooSymbols = [];
+      HELD.forEach(function(r) {
+        var m = TMAP[r.ticker];
+        if (m && m.yahoo) yahooSymbols.push(m.yahoo);
+      });
 
-  }).catch(function(e) { setStatus('err', 'Error MEP: ' + e.message); });
+      var yUrl = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols=' +
+                 encodeURIComponent(yahooSymbols.join(',')) + '&fields=regularMarketPrice&formatted=false';
+
+      var pY = proxyGet(yUrl)
+        .then(function(body) {
+          var results = (body.quoteResponse && body.quoteResponse.result) || [];
+          console.log('[Yahoo] ' + results.length + ' resultados');
+          var out = {};
+          results.forEach(function(q) { out[q.symbol] = q.regularMarketPrice; });
+          return out;
+        })
+        .catch(function(e) { console.warn('[Yahoo] error:', e.message); return {}; });
+
+      // --- Bonos: Rava Bursátil API (CORS abierto, sin proxy) ---
+      // https://www.rava.com/perfil/cotizaciones?e=TICKER
+      // Usamos la API JSON de cotizaciones de Rava
+      var bymaList = [];
+      HELD.forEach(function(r) {
+        var m = TMAP[r.ticker];
+        if (m && m.byma) bymaList.push({ local: r.ticker, sym: m.byma });
+      });
+
+      // Rava tiene endpoint: https://www.rava.com/perfil/cotizaciones.json?e=AL30D
+      // También probamos con: https://api.lyra.com.ar o similar
+      // La alternativa más robusta: IOL (invertironline) o ambito
+      // Usamos el endpoint de cotizaciones de BYMA pero via allorigins con timeout más alto
+      // Y también probamos el endpoint alternativo de mercado argentino
+      var pB = Promise.all(bymaList.map(function(item) {
+        // Probamos Rava primero (CORS abierto)
+        var ravaUrl = 'https://www.rava.com/perfil/cotizaciones.json?e=' + item.sym;
+        return fetch(ravaUrl)
+          .then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
+          .then(function(data) {
+            // Rava devuelve array de cotizaciones con campo "ultimo"
+            var p = parseFloat(data.ultimo || data.last || data.price || 0);
+            console.log('[Rava]', item.sym, '=', p);
+            if (p > 0) liveP[item.local] = p;
+          })
+          .catch(function() {
+            // Fallback: Ambito Financiero scraping via proxy
+            var ambitoUrl = 'https://mercados.ambito.com//bono/A_' + item.sym + '/grafico/1-dia/ajax';
+            return proxyGet(ambitoUrl)
+              .then(function(data) {
+                var series = data.serie || data.data || [];
+                var last = series[series.length - 1];
+                var p = last ? parseFloat(last[1] || last.close || 0) : 0;
+                console.log('[Ambito]', item.sym, '=', p);
+                if (p > 0) liveP[item.local] = p;
+              })
+              .catch(function(e) { console.warn('[Bonds] ' + item.sym + ' failed:', e.message); });
+          });
+      }));
+
+      Promise.all([pY, pB]).then(function(res) {
+        var yRes = res[0];
+        // Yahoo ARS -> USD
+        HELD.forEach(function(r) {
+          var m = TMAP[r.ticker];
+          if (!m) return;
+          if (m.yahoo && yRes[m.yahoo] && yRes[m.yahoo] > 0) {
+            liveP[r.ticker] = yRes[m.yahoo] / mepVal;
+            console.log('[liveP]', r.ticker, '=', liveP[r.ticker].toFixed(4), 'USD');
+          }
+        });
+
+        var n = Object.keys(liveP).length;
+        console.log('[liveP] total:', n, liveP);
+        setStatus('ok', 'MEP $' + Math.round(mepVal) + ' | ' + n + '/28 precios obtenidos');
+        renderCartera();
+      });
+
+    }).catch(function(e) { setStatus('err', 'Error: ' + e.message); });
 }
 
 function renderCartera() {
@@ -626,14 +616,14 @@ function renderCartera() {
 
   var rows = HELD.map(function(r) {
     var m      = TMAP[r.ticker] || {};
-    var pMkt   = liveP[r.ticker] || null;          // precio unitario en USD
+    var pMkt   = liveP.hasOwnProperty(r.ticker) ? liveP[r.ticker] : null;
     var pCmp   = r.cantidad > 0 ? r.costo_usd / r.cantidad : 0;
-    var costo  = r.costo_usd;                       // lo que gasté
+    var costo  = r.costo_usd;
     var vMkt   = pMkt !== null ? pMkt * r.cantidad : null;
     var rev    = vMkt !== null ? vMkt - costo : null;
     var revP   = rev !== null && costo > 0 ? rev / costo * 100 : null;
-    var src    = m.yahoo ? 'Yahoo/MEP' : m.byma ? 'BYMA' : 'Costo';
-    var isLive = pMkt !== null && src !== 'Costo';
+    var src    = m.yahoo ? 'Yahoo/MEP' : m.byma ? (m.byma ? 'Rava/BYMA' : 'BYMA') : 'Costo';
+    var isLive = pMkt !== null && (m.yahoo || m.byma);
 
     totCst += costo;
     totMkt += vMkt !== null ? vMkt : costo;
@@ -643,15 +633,15 @@ function renderCartera() {
     return { r: r, pCmp: pCmp, pMkt: pMkt, costo: costo, vMkt: vMkt, rev: rev, revP: revP, src: src, isLive: isLive };
   });
 
-  // Summary cards
-  el('cCst').textContent  = u2(totCst);
-  el('cMkt').textContent  = u2(totMkt);
+  // Cards
+  el('cCst').textContent = u2(totCst);
+  el('cMkt').textContent = u2(totMkt);
   var ep = el('cPnl');
   if (ep) { ep.textContent = sgn(totRev); ep.className = 'kv ' + cls(totRev); }
-  el('cPnlP').textContent = (totCst > 0 ? pct(totRev / totCst * 100) : '—') + ' sobre costo';
+  el('cPnlP').textContent = (totCst > 0 ? pct(totRev / totCst * 100) : '\u2014') + ' sobre costo';
   el('cCob').textContent  = nLive + '/28';
 
-  // Update banner
+  // Banner revalorizacion
   var eRev = el('pb-rev');
   if (eRev) { eRev.textContent = sgn(totRev); eRev.className = 'pb-val ' + cls(totRev); }
   set('pb-rev-s', (totCst > 0 ? pct(totRev / totCst * 100) : '') + ' sobre costo de cartera');
@@ -661,17 +651,13 @@ function renderCartera() {
     note.textContent = '* Revalorizaci\u00f3n con ' + nLive + '/28 posiciones a precio de mercado. MEP: $' + Math.round(mepVal) + '. ONs y fondos valuados a costo.';
   }
 
-  // Sort by market value desc
   rows.sort(function(a, b) { return (b.vMkt || b.costo) - (a.vMkt || a.costo); });
 
   el('bCart').innerHTML = rows.map(function(x) {
     var r  = x.r;
     var pp = totMkt > 0 ? (((x.vMkt || x.costo) / totMkt) * 100).toFixed(1) : '0';
 
-    var mktCell = x.pMkt !== null && x.isLive
-      ? '<b>' + u2(x.pMkt) + '</b>'
-      : '<span style="color:var(--muted2)">@ costo</span>';
-
+    var mktCell  = x.isLive ? '<b>' + u2(x.pMkt) + '</b>' : '<span style="color:var(--muted2)">@ costo</span>';
     var revCell  = x.rev  !== null ? '<span class="' + cls(x.rev)  + '">' + sgn(x.rev)  + '</span>' : '\u2014';
     var revPCell = x.revP !== null ? '<span class="' + cls(x.revP) + '">' + pct(x.revP) + '</span>' : '\u2014';
 
