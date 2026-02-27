@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Reporte de Inversiones</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d0f14;--s:#141720;--s2:#181d28;--bdr:#252a35;--bdr2:#2e3547;
+  --gold:#c9a84c;--goldd:#8a7035;--green:#4ade80;--red:#f87171;
+  --blue:#60a5fa;--purple:#a78bfa;--orange:#fb923c;
+  --txt:#e8eaf0;--muted:#6b7280;--muted2:#4b5563}
+html,body{background:var(--bg);color:var(--txt);font-family:"DM Mono",monospace;min-height:100vh}
+.page{max-width:1100px;margin:0 auto;padding:2rem 1.25rem 4rem}
+h1{font-family:"Playfair Display",serif;color:var(--gold);font-size:1.6rem;margin-bottom:.25rem}
+.sub{color:var(--muted);font-size:.75rem;letter-spacing:.1em;margin-bottom:2rem}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:700px){.g4{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}}
+.card{background:var(--s);border:1px solid var(--bdr);border-radius:14px;padding:1.25rem 1.5rem;
+  box-shadow:0 0 0 1px rgba(255,255,255,.03),0 8px 32px rgba(0,0,0,.4)}
+.kl{font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem}
+.kv{font-size:1.4rem;font-weight:500}
+.ks{font-size:.68rem;color:var(--muted);margin-top:.2rem}
+.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--gold)}
+.sec{font-family:"Playfair Display",serif;color:var(--gold);font-size:1rem;
+  margin:2rem 0 1rem;padding-bottom:.5rem;border-bottom:1px solid var(--bdr)}
+.cw{position:relative;height:260px}.cw.tall{height:320px}.cw.sm{height:200px}
+.tw{overflow-x:auto;max-height:420px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:.73rem}
+thead th{position:sticky;top:0;background:var(--s2);padding:.55rem .7rem;text-align:left;
+  font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+  border-bottom:1px solid var(--bdr);white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{color:var(--txt)}
+thead th.asc::after{content:" ▲"}thead th.desc::after{content:" ▼"}
+tbody tr{border-bottom:1px solid rgba(255,255,255,.04);transition:background .12s}
+tbody tr:hover{background:rgba(255,255,255,.04)}
+tbody td{padding:.5rem .7rem;white-space:nowrap}
+tbody td.r{text-align:right}
+.badge{display:inline-block;padding:.15rem .5rem;border-radius:20px;font-size:.6rem;font-weight:500}
+.b-acc{background:rgba(96,165,250,.15);color:var(--blue)}
+.b-bon{background:rgba(201,168,76,.15);color:var(--gold)}
+.b-ced{background:rgba(167,139,250,.15);color:var(--purple)}
+.b-cor{background:rgba(251,146,60,.15);color:var(--orange)}
+.b-fon{background:rgba(74,222,128,.15);color:var(--green)}
+.b-let{background:rgba(107,114,128,.15);color:var(--muted)}
+.fr{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.75rem;align-items:center}
+.fr input,.fr select{background:rgba(255,255,255,.04);border:1px solid var(--bdr2);
+  border-radius:8px;color:var(--txt);font-family:"DM Mono",monospace;
+  font-size:.7rem;padding:.35rem .65rem;outline:none}
+.fr input:focus,.fr select:focus{border-color:var(--goldd)}
+.tabs{display:flex;gap:.4rem;margin-bottom:1rem;flex-wrap:wrap}
+.tab{padding:.4rem .9rem;border-radius:8px;border:1px solid var(--bdr2);background:transparent;
+  color:var(--muted);font-family:"DM Mono",monospace;font-size:.68rem;cursor:pointer;
+  transition:all .15s;letter-spacing:.05em}
+.tab:hover,.tab.active{background:rgba(201,168,76,.12);border-color:var(--goldd);color:var(--gold)}
+.tc{display:none}.tc.active{display:block}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;display:inline-block}
+.dot.ok{background:var(--green)}.dot.err{background:var(--red)}
+.dot.spin{background:var(--gold);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:4px}
+</style>
+</head>
+<body>
+<div class="page">
+<h1>&#x1F4CA; Reporte de Inversiones</h1>
+<div class="sub">Per&#xED;odo: 11/03/2024 &rarr; 24/02/2026 &nbsp;|&nbsp; Valores en USD (conversi&#xF3;n v&#xED;a tipo MEP)</div>
+
+<div class="g4">
+  <div class="card"><div class="kl">P&amp;L Total</div><div class="kv neu" id="k0"></div><div class="ks">Trading + Cupones + Dividendos</div></div>
+  <div class="card"><div class="kl">P&amp;L Trading</div><div class="kv" id="k1"></div><div class="ks" id="k1s"></div></div>
+  <div class="card"><div class="kl">Ingresos Pasivos</div><div class="kv pos" id="k2"></div><div class="ks" id="k2s"></div></div>
+  <div class="card"><div class="kl">Win Rate</div><div class="kv" id="k3"></div><div class="ks" id="k3s"></div></div>
+</div>
+<div class="g4" style="margin-top:1rem">
+  <div class="card"><div class="kl">Mejor Trade</div><div class="kv pos" id="k4"></div><div class="ks" id="k4s"></div></div>
+  <div class="card"><div class="kl">Peor Trade</div><div class="kv neg" id="k5"></div><div class="ks" id="k5s"></div></div>
+  <div class="card"><div class="kl">Ganancia Prom.</div><div class="kv pos" id="k6"></div><div class="ks">Por op. ganadora</div></div>
+  <div class="card"><div class="kl">P&#xE9;rdida Prom.</div><div class="kv neg" id="k7"></div><div class="ks">Por op. perdedora</div></div>
+</div>
+
+<div class="sec">Evoluci&#xF3;n y Distribuci&#xF3;n</div>
+<div class="g2">
+  <div class="card"><div style="font-size:.72rem;color:var(--muted);margin-bottom:.75rem;letter-spacing:.08em">P&amp;L ACUMULADO</div><div class="cw"><canvas id="cCumul"></canvas></div></div>
+  <div class="card"><div style="font-size:.72rem;color:var(--muted);margin-bottom:.75rem;letter-spacing:.08em">P&amp;L MENSUAL</div><div class="cw"><canvas id="cMonth"></canvas></div></div>
+</div>
+<div class="g2" style="margin-top:1rem">
+  <div class="card"><div style="font-size:.72rem;color:var(--muted);margin-bottom:.75rem;letter-spacing:.08em">POR CATEGOR&#xCD;A</div><div class="cw sm"><canvas id="cTipo"></canvas></div></div>
+  <div class="card"><div style="font-size:.72rem;color:var(--muted);margin-bottom:.75rem;letter-spacing:.08em">RANKING TICKERS (TOP 15)</div><div class="cw tall"><canvas id="cTick"></canvas></div></div>
+</div>
+
+<div class="sec">An&#xE1;lisis Detallado</div>
+<div class="tabs">
+  <button class="tab active" onclick="showTab(this,'t-tickers')">Por Ticker</button>
+  <button class="tab" onclick="showTab(this,'t-trades')">Operaciones</button>
+  <button class="tab" onclick="showTab(this,'t-cartera')">Cartera Valorizada</button>
+  <button class="tab" onclick="showTab(this,'t-income')">Cupones y Dividendos</button>
+</div>
+
+<div class="tc active" id="t-tickers">
+  <div class="card">
+    <div class="fr">
+      <input type="text" id="fq" placeholder="Buscar..." oninput="rTick()">
+      <select id="fti" onchange="rTick()">
+        <option value="">Todas las categor&#xED;as</option>
+        <option>Acciones</option><option>Cedears</option><option>Bonos - D&#xF3;lar</option>
+        <option>Bonos - D&#xF3;lar Link</option><option>Corporativos - D&#xF3;lar</option>
+        <option>Fondos</option><option>Letras - ARS</option>
+      </select>
+    </div>
+    <div class="tw"><table id="tTick">
+      <thead><tr>
+        <th onclick="srt('tick','tTick',0,'ticker')">Ticker</th>
+        <th onclick="srt('tick','tTick',1,'desc')">Instrumento</th>
+        <th onclick="srt('tick','tTick',2,'tipo')">Tipo</th>
+        <th onclick="srt('tick','tTick',3,'ops')" class="r">Ops</th>
+        <th onclick="srt('tick','tTick',4,'pnl')" class="r">P&amp;L Trading</th>
+        <th onclick="srt('tick','tTick',5,'cupones')" class="r">Cupones</th>
+        <th onclick="srt('tick','tTick',6,'dividendos')" class="r">Dividendos</th>
+        <th onclick="srt('tick','tTick',7,'total')" class="r">Total</th>
+        <th onclick="srt('tick','tTick',8,'retorno_pct')" class="r">Ret %</th>
+        <th onclick="srt('tick','tTick',9,'dias')" class="r">D&#xED;as prom.</th>
+      </tr></thead>
+      <tbody id="bTick"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<div class="tc" id="t-trades">
+  <div class="card">
+    <div class="fr">
+      <input type="text" id="ftq" placeholder="Buscar ticker..." oninput="rTrades()">
+      <select id="ftt" onchange="rTrades()">
+        <option value="">Todas las categor&#xED;as</option>
+        <option>Acciones</option><option>Cedears</option><option>Bonos - D&#xF3;lar</option>
+        <option>Bonos - D&#xF3;lar Link</option><option>Corporativos - D&#xF3;lar</option>
+        <option>Fondos</option><option>Letras - ARS</option>
+      </select>
+      <select id="ftr" onchange="rTrades()">
+        <option value="">Todos</option>
+        <option value="win">Solo ganancias</option>
+        <option value="loss">Solo p&#xE9;rdidas</option>
+      </select>
+    </div>
+    <div class="tw"><table id="tTrade">
+      <thead><tr>
+        <th onclick="srt('trade','tTrade',0,'ticker')">Ticker</th>
+        <th onclick="srt('trade','tTrade',1,'tipo')">Tipo</th>
+        <th onclick="srt('trade','tTrade',2,'fecha_compra')">F. Compra</th>
+        <th onclick="srt('trade','tTrade',3,'fecha_venta')">F. Venta</th>
+        <th onclick="srt('trade','tTrade',4,'dias')" class="r">D&#xED;as</th>
+        <th onclick="srt('trade','tTrade',5,'cantidad')" class="r">Cant.</th>
+        <th onclick="srt('trade','tTrade',6,'pc')" class="r">P. Compra</th>
+        <th onclick="srt('trade','tTrade',7,'pv')" class="r">P. Venta</th>
+        <th onclick="srt('trade','tTrade',8,'gastos')" class="r">Gastos</th>
+        <th onclick="srt('trade','tTrade',9,'pnl')" class="r">P&amp;L</th>
+        <th onclick="srt('trade','tTrade',10,'ret_pct')" class="r">Ret %</th>
+      </tr></thead>
+      <tbody id="bTrade"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<div class="tc" id="t-cartera">
+  <div style="display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;background:var(--s);border:1px solid var(--bdr);border-radius:10px;margin-bottom:1rem;font-size:.72rem;color:var(--muted)">
+    <div class="dot" id="cdot"></div>
+    <span id="ctxt">Abri este tab para cargar precios en vivo</span>
+    <button onclick="loadPrices()" style="margin-left:auto;background:rgba(201,168,76,.12);border:1px solid var(--goldd);border-radius:6px;color:var(--gold);font-family:'DM Mono',monospace;font-size:.65rem;padding:.3rem .7rem;cursor:pointer">&#x21BB; Actualizar</button>
+  </div>
+  <div class="g4" style="margin-bottom:1rem">
+    <div class="card"><div class="kl">Valor de Mercado</div><div class="kv neu" id="cMkt">&#x2014;</div><div class="ks">Total cartera USD</div></div>
+    <div class="card"><div class="kl">Costo Total</div><div class="kv" id="cCst" style="color:var(--txt)">&#x2014;</div><div class="ks">Precio promedio compra</div></div>
+    <div class="card"><div class="kl">P&amp;L No Realizado</div><div class="kv" id="cPnl">&#x2014;</div><div class="ks" id="cPnlP"></div></div>
+    <div class="card"><div class="kl">Precios obtenidos</div><div class="kv neu" id="cCob">&#x2014;</div><div class="ks">de 28 posiciones</div></div>
+  </div>
+  <div class="card">
+    <div class="tw"><table>
+      <thead><tr>
+        <th>Ticker</th><th>Instrumento</th><th>Tipo</th>
+        <th class="r">Cant.</th><th class="r">P. Compra USD</th>
+        <th class="r">P. Mercado USD</th><th class="r">Costo Total</th>
+        <th class="r">Valor Mercado</th><th class="r">P&amp;L USD</th>
+        <th class="r">P&amp;L %</th><th class="r">% Cartera</th><th class="r">Fuente</th>
+      </tr></thead>
+      <tbody id="bCart"></tbody>
+    </table></div>
+  </div>
+  <div style="font-size:.62rem;color:var(--muted2);margin-top:.75rem;line-height:1.8">
+    * Acciones y CEDEARs: precio ARS v&#xED;a Yahoo Finance, convertido a USD con tipo MEP (dolarito.ar).<br>
+    * Bonos soberanos y BOPREALes: precio USD v&#xED;a BYMA open data.<br>
+    * ONs corporativas y fondos: valuados a precio de costo (sin cotizaci&#xF3;n p&#xFA;blica confiable).<br>
+    * Precios con hasta 15 min de demora. No constituyen asesoramiento financiero.
+  </div>
+</div>
+
+<div class="tc" id="t-income">
+  <div class="g2">
+    <div class="card">
+      <div style="font-size:.72rem;color:var(--muted);margin-bottom:.75rem;letter-spacing:.08em">CUPONES</div>
+      <div class="tw"><table>
+        <thead><tr><th>Ticker</th><th>Fecha</th><th class="r">Monto USD</th></tr></thead>
+        <tbody id="bCup"></tbody>
+        <tfoot><tr style="border-top:1px solid var(--bdr2)">
+          <td colspan="2" style="padding:.5rem .7rem;font-size:.68rem;color:var(--muted)">TOTAL</td>
+          <td class="r pos" id="fCup" style="padding:.5rem .7rem"></td>
+        </tr></tfoot>
+      </table></div>
+    </div>
+    <div class="card">
+      <div style="font-size:.72rem;color:var(--muted);margin-bottom:.75rem;letter-spacing:.08em">DIVIDENDOS</div>
+      <div class="tw"><table>
+        <thead><tr><th>Ticker</th><th>Fecha</th><th class="r">Monto USD</th></tr></thead>
+        <tbody id="bDiv"></tbody>
+        <tfoot><tr style="border-top:1px solid var(--bdr2)">
+          <td colspan="2" style="padding:.5rem .7rem;font-size:.68rem;color:var(--muted)">TOTAL</td>
+          <td class="r pos" id="fDiv" style="padding:.5rem .7rem"></td>
+        </tr></tfoot>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+</div>
+<script>
+var STATS={"total_trades": 181, "winners": 96, "losers": 85, "win_rate": 53.0387, "pnl_trading": 1235.215, "pnl_cupones": 1131.9428, "pnl_dividendos": 226.5767, "gastos": 458.1586, "pnl_total": 2593.7345, "avg_gain": 34.9701, "avg_loss": -24.9637, "best_trade_ticker": "GD35", "best_trade_val": 336.3612, "worst_trade_ticker": "BPO28", "worst_trade_val": -813.0952, "fecha_desde": "11/03/2024", "fecha_hasta": "24/02/2026"};
+var MONTHLY=[{"mes": "2024-03", "pnl": 1.5893}, {"mes": "2024-04", "pnl": -56.8583}, {"mes": "2024-05", "pnl": 102.7583}, {"mes": "2024-06", "pnl": 57.1318}, {"mes": "2024-07", "pnl": -28.7613}, {"mes": "2024-08", "pnl": 9.9668}, {"mes": "2024-09", "pnl": 309.4829}, {"mes": "2024-10", "pnl": 7.312}, {"mes": "2024-11", "pnl": 463.4097}, {"mes": "2024-12", "pnl": -7.7373}, {"mes": "2025-01", "pnl": -19.9774}, {"mes": "2025-02", "pnl": 1038.6681}, {"mes": "2025-03", "pnl": -27.3023}, {"mes": "2025-04", "pnl": -9.6789}, {"mes": "2025-05", "pnl": -20.4422}, {"mes": "2025-06", "pnl": -332.0014}, {"mes": "2025-07", "pnl": 289.6948}, {"mes": "2025-08", "pnl": -25.6117}, {"mes": "2025-09", "pnl": -930.6564}, {"mes": "2025-10", "pnl": 47.6462}, {"mes": "2025-11", "pnl": -0.5575}, {"mes": "2025-12", "pnl": 44.2762}, {"mes": "2026-01", "pnl": 367.1136}, {"mes": "2026-02", "pnl": -44.25}];
+var CUMUL=[{"fecha": "2024-03-11", "pnl": 1.3501}, {"fecha": "2024-03-19", "pnl": -0.8378}, {"fecha": "2024-03-19", "pnl": -1.1584}, {"fecha": "2024-03-19", "pnl": 0.9443}, {"fecha": "2024-03-19", "pnl": 1.5893}, {"fecha": "2024-04-04", "pnl": 4.8944}, {"fecha": "2024-04-05", "pnl": 2.4016}, {"fecha": "2024-04-05", "pnl": -2.1827}, {"fecha": "2024-04-09", "pnl": -5.4384}, {"fecha": "2024-04-09", "pnl": -2.1173}, {"fecha": "2024-04-16", "pnl": 12.4883}, {"fecha": "2024-04-18", "pnl": -1.1873}, {"fecha": "2024-04-19", "pnl": -14.7916}, {"fecha": "2024-04-19", "pnl": -16.5764}, {"fecha": "2024-04-19", "pnl": -30.9531}, {"fecha": "2024-04-19", "pnl": -37.9843}, {"fecha": "2024-04-19", "pnl": -45.3368}, {"fecha": "2024-04-19", "pnl": -55.082}, {"fecha": "2024-04-22", "pnl": -55.269}, {"fecha": "2024-05-02", "pnl": -47.9833}, {"fecha": "2024-05-28", "pnl": 47.4893}, {"fecha": "2024-06-10", "pnl": 39.4782}, {"fecha": "2024-06-10", "pnl": 36.6456}, {"fecha": "2024-06-10", "pnl": 11.4839}, {"fecha": "2024-06-10", "pnl": 15.2787}, {"fecha": "2024-06-10", "pnl": 60.3378}, {"fecha": "2024-06-24", "pnl": 61.3594}, {"fecha": "2024-06-24", "pnl": 67.7843}, {"fecha": "2024-06-24", "pnl": 104.6211}, {"fecha": "2024-07-29", "pnl": 75.8598}, {"fecha": "2024-08-08", "pnl": 71.1025}, {"fecha": "2024-08-08", "pnl": 76.7989}, {"fecha": "2024-08-08", "pnl": 82.4065}, {"fecha": "2024-08-26", "pnl": 83.9343}, {"fecha": "2024-08-28", "pnl": 85.8266}, {"fecha": "2024-09-09", "pnl": 102.3446}, {"fecha": "2024-09-10", "pnl": 96.6324}, {"fecha": "2024-09-10", "pnl": 93.5262}, {"fecha": "2024-09-10", "pnl": 72.6167}, {"fecha": "2024-09-10", "pnl": 62.5361}, {"fecha": "2024-09-10", "pnl": 60.7231}, {"fecha": "2024-09-10", "pnl": 391.9893}, {"fecha": "2024-09-10", "pnl": 387.1039}, {"fecha": "2024-09-23", "pnl": 389.4089}, {"fecha": "2024-09-23", "pnl": 395.3095}, {"fecha": "2024-10-14", "pnl": 393.4842}, {"fecha": "2024-10-14", "pnl": 353.3852}, {"fecha": "2024-10-14", "pnl": 329.6562}, {"fecha": "2024-10-14", "pnl": 329.5763}, {"fecha": "2024-10-14", "pnl": 331.3773}, {"fecha": "2024-10-14", "pnl": 344.1815}, {"fecha": "2024-10-14", "pnl": 324.4345}, {"fecha": "2024-10-14", "pnl": 330.4144}, {"fecha": "2024-10-16", "pnl": 330.191}, {"fecha": "2024-10-16", "pnl": 333.1095}, {"fecha": "2024-10-17", "pnl": 335.0455}, {"fecha": "2024-10-21", "pnl": 339.1057}, {"fecha": "2024-10-21", "pnl": 372.0445}, {"fecha": "2024-10-21", "pnl": 375.5979}, {"fecha": "2024-10-21", "pnl": 387.3367}, {"fecha": "2024-10-28", "pnl": 402.6215}, {"fecha": "2024-11-08", "pnl": 409.1074}, {"fecha": "2024-11-08", "pnl": 412.4944}, {"fecha": "2024-11-14", "pnl": 450.4203}, {"fecha": "2024-11-14", "pnl": 557.1766}, {"fecha": "2024-11-27", "pnl": 536.3827}, {"fecha": "2024-11-27", "pnl": 530.316}, {"fecha": "2024-11-27", "pnl": 529.6629}, {"fecha": "2024-11-27", "pnl": 514.2462}, {"fecha": "2024-11-27", "pnl": 517.9595}, {"fecha": "2024-11-27", "pnl": 594.518}, {"fecha": "2024-11-28", "pnl": 732.1598}, {"fecha": "2024-11-28", "pnl": 866.0312}, {"fecha": "2024-12-12", "pnl": 871.3831}, {"fecha": "2024-12-30", "pnl": 858.2938}, {"fecha": "2025-01-22", "pnl": 852.0407}, {"fecha": "2025-01-22", "pnl": 843.5513}, {"fecha": "2025-01-22", "pnl": 842.0475}, {"fecha": "2025-01-22", "pnl": 836.0811}, {"fecha": "2025-01-28", "pnl": 838.3164}, {"fecha": "2025-02-07", "pnl": 903.7556}, {"fecha": "2025-02-07", "pnl": 984.503}, {"fecha": "2025-02-07", "pnl": 1003.9567}, {"fecha": "2025-02-07", "pnl": 1046.9539}, {"fecha": "2025-02-07", "pnl": 1074.1644}, {"fecha": "2025-02-07", "pnl": 1093.0802}, {"fecha": "2025-02-07", "pnl": 1136.7161}, {"fecha": "2025-02-07", "pnl": 1111.8067}, {"fecha": "2025-02-07", "pnl": 1228.2279}, {"fecha": "2025-02-07", "pnl": 1240.3472}, {"fecha": "2025-02-07", "pnl": 1399.4251}, {"fecha": "2025-02-07", "pnl": 1526.8192}, {"fecha": "2025-02-17", "pnl": 1542.481}, {"fecha": "2025-02-25", "pnl": 1543.1081}, {"fecha": "2025-02-25", "pnl": 1543.2877}, {"fecha": "2025-02-25", "pnl": 1540.6233}, {"fecha": "2025-02-25", "pnl": 1876.9846}, {"fecha": "2025-03-05", "pnl": 1875.218}, {"fecha": "2025-03-05", "pnl": 1854.2189}, {"fecha": "2025-03-05", "pnl": 1861.2036}, {"fecha": "2025-03-05", "pnl": 1861.2823}, {"fecha": "2025-03-05", "pnl": 1871.4871}, {"fecha": "2025-03-05", "pnl": 1871.6369}, {"fecha": "2025-03-05", "pnl": 1871.2762}, {"fecha": "2025-03-05", "pnl": 1877.2493}, {"fecha": "2025-03-05", "pnl": 1876.1573}, {"fecha": "2025-03-05", "pnl": 1881.4785}, {"fecha": "2025-03-05", "pnl": 1867.4707}, {"fecha": "2025-03-05", "pnl": 1873.5184}, {"fecha": "2025-03-06", "pnl": 1869.5454}, {"fecha": "2025-03-06", "pnl": 1879.6026}, {"fecha": "2025-03-12", "pnl": 1854.0798}, {"fecha": "2025-03-12", "pnl": 1855.6551}, {"fecha": "2025-03-12", "pnl": 1845.5211}, {"fecha": "2025-03-12", "pnl": 1864.8452}, {"fecha": "2025-03-12", "pnl": 1852.6794}, {"fecha": "2025-03-12", "pnl": 1849.6823}, {"fecha": "2025-04-04", "pnl": 1839.6246}, {"fecha": "2025-04-22", "pnl": 1840.0034}, {"fecha": "2025-05-05", "pnl": 1824.2227}, {"fecha": "2025-05-06", "pnl": 1819.5613}, {"fecha": "2025-06-27", "pnl": 1696.0464}, {"fecha": "2025-06-27", "pnl": 1487.5599}, {"fecha": "2025-07-03", "pnl": 1483.1431}, {"fecha": "2025-07-16", "pnl": 1482.377}, {"fecha": "2025-07-16", "pnl": 1481.2516}, {"fecha": "2025-07-16", "pnl": 1478.4509}, {"fecha": "2025-07-16", "pnl": 1475.1371}, {"fecha": "2025-07-16", "pnl": 1474.6805}, {"fecha": "2025-07-16", "pnl": 1474.6077}, {"fecha": "2025-07-17", "pnl": 1451.7741}, {"fecha": "2025-07-17", "pnl": 1478.4575}, {"fecha": "2025-07-29", "pnl": 1519.2517}, {"fecha": "2025-07-29", "pnl": 1523.0089}, {"fecha": "2025-07-29", "pnl": 1531.3664}, {"fecha": "2025-07-29", "pnl": 1539.8323}, {"fecha": "2025-07-29", "pnl": 1659.6897}, {"fecha": "2025-07-29", "pnl": 1723.3291}, {"fecha": "2025-07-29", "pnl": 1788.8015}, {"fecha": "2025-07-30", "pnl": 1788.7035}, {"fecha": "2025-07-30", "pnl": 1777.2547}, {"fecha": "2025-08-01", "pnl": 1754.3445}, {"fecha": "2025-08-29", "pnl": 1751.643}, {"fecha": "2025-09-01", "pnl": 1763.6905}, {"fecha": "2025-09-01", "pnl": 1764.8921}, {"fecha": "2025-09-01", "pnl": 1777.2787}, {"fecha": "2025-09-01", "pnl": 1798.8797}, {"fecha": "2025-09-01", "pnl": 1803.2528}, {"fecha": "2025-09-01", "pnl": 1790.0529}, {"fecha": "2025-09-01", "pnl": 1774.2198}, {"fecha": "2025-09-01", "pnl": 1826.9549}, {"fecha": "2025-09-01", "pnl": 1915.3936}, {"fecha": "2025-09-12", "pnl": 1876.8639}, {"fecha": "2025-09-30", "pnl": 1634.0818}, {"fecha": "2025-09-30", "pnl": 820.9866}, {"fecha": "2025-10-07", "pnl": 820.9636}, {"fecha": "2025-10-07", "pnl": 830.9879}, {"fecha": "2025-10-22", "pnl": 868.6328}, {"fecha": "2025-11-04", "pnl": 868.0752}, {"fecha": "2025-12-03", "pnl": 912.3514}, {"fecha": "2026-01-13", "pnl": 1088.9885}, {"fecha": "2026-01-27", "pnl": 1091.9245}, {"fecha": "2026-01-29", "pnl": 1275.0284}, {"fecha": "2026-01-29", "pnl": 1279.465}, {"fecha": "2026-02-02", "pnl": 1283.722}, {"fecha": "2026-02-24", "pnl": 1265.4282}, {"fecha": "2026-02-24", "pnl": 1265.0364}, {"fecha": "2026-02-24", "pnl": 1276.9506}, {"fecha": "2026-02-24", "pnl": 1279.4717}, {"fecha": "2026-02-24", "pnl": 1265.5804}, {"fecha": "2026-02-24", "pnl": 1236.8141}, {"fecha": "2026-02-24", "pnl": 1238.2533}, {"fecha": "2026-02-24", "pnl": 1240.5923}, {"fecha": "2026-02-24", "pnl": 1226.2488}, {"fecha": "2026-02-24", "pnl": 1238.0629}, {"fecha": "2026-02-24", "pnl": 1238.0595}, {"fecha": "2026-02-24", "pnl": 1238.0194}, {"fecha": "2026-02-24", "pnl": 1237.6269}, {"fecha": "2026-02-24", "pnl": 1236.279}, {"fecha": "2026-02-24", "pnl": 1239.0321}, {"fecha": "2026-02-24", "pnl": 1235.215}];
+var TICKERS=[{"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "tipo": "Bonos - Dólar", "pnl": 699.1168, "ops": 9, "dias": 234.1111, "retorno_pct": 43.6015, "cupones": 171.6057, "dividendos": 0.0, "total": 870.7225000000001}, {"ticker": "AL30", "desc": "BONO REP. ARGENTINA USD STEP UP 2030", "tipo": "Bonos - Dólar", "pnl": 369.0259, "ops": 10, "dias": 27.0, "retorno_pct": 3.5858, "cupones": 9.1539, "dividendos": 0.0, "total": 378.1798}, {"ticker": "BPOD7", "desc": "BOPREAL S. 1 D VTO31/10/27 U$S CG", "tipo": "Bonos - Dólar", "pnl": 310.157, "ops": 8, "dias": 265.0, "retorno_pct": 0, "cupones": 114.1121, "dividendos": 0.0, "total": 424.2691}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "tipo": "Acciones", "pnl": 306.5895, "ops": 6, "dias": 252.6667, "retorno_pct": 114.1793, "cupones": 0.0, "dividendos": 58.3221, "total": 364.91159999999996}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "tipo": "Acciones", "pnl": 232.2354, "ops": 4, "dias": 192.5, "retorno_pct": 60.0474, "cupones": 0.0, "dividendos": 79.8635, "total": 312.0989}, {"ticker": "GD30", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/30", "tipo": "Bonos - Dólar", "pnl": 200.5163, "ops": 4, "dias": 288.0, "retorno_pct": 0, "cupones": 32.388, "dividendos": 0.0, "total": 232.9043}, {"ticker": "TGSU2", "desc": "T. DE GAS DEL SUR ESC. \"B\" 1 V.", "tipo": "Acciones", "pnl": 186.4614, "ops": 11, "dias": 360.7273, "retorno_pct": 33.9109, "cupones": 0.0, "dividendos": 33.9729, "total": 220.4343}, {"ticker": "YM39O", "desc": "ON YPF CLASE 39 VTO 22/07/30 U$S CG", "tipo": "Corporativos - Dólar", "pnl": 176.637, "ops": 1, "dias": 180.0, "retorno_pct": 10.7409, "cupones": 0.0, "dividendos": 0.0, "total": 176.637}, {"ticker": "EQUITYSA", "desc": "Equity Selection Clase A", "tipo": "Fondos", "pnl": 168.1825, "ops": 9, "dias": 60.5556, "retorno_pct": 20.1158, "cupones": 0.0, "dividendos": 0.0, "total": 168.1825}, {"ticker": "BPY26", "desc": "BOPREAL S.3 VTO31/05/26 U$S CG", "tipo": "Bonos - Dólar", "pnl": 144.6822, "ops": 2, "dias": 106.0, "retorno_pct": 12.9993, "cupones": 8.5902, "dividendos": 0.0, "total": 153.2724}, {"ticker": "CS48O", "desc": "ON CRESUD S32 CL48 V11/07/28 U$S CG", "tipo": "Corporativos - Dólar", "pnl": 44.2762, "ops": 1, "dias": 153.0, "retorno_pct": 5.55, "cupones": 0.0, "dividendos": 0.0, "total": 44.2762}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "pnl": 39.531, "ops": 13, "dias": 226.9231, "retorno_pct": 7.8221, "cupones": 0.0, "dividendos": 52.394, "total": 91.925}, {"ticker": "ECOG", "desc": "ECOGAS INV.  CL.D  1 V. ESCRIT", "tipo": "Acciones", "pnl": 37.6448, "ops": 1, "dias": 21.0, "retorno_pct": 0, "cupones": 0.0, "dividendos": 0.0, "total": 37.6448}, {"ticker": "DNC5O", "desc": "ON EDENOR CL.5 V.05/08/28 U$S CG", "tipo": "Corporativos - Dólar", "pnl": 27.5844, "ops": 8, "dias": 345.0, "retorno_pct": 2.6171, "cupones": 167.3494, "dividendos": 0.0, "total": 194.9338}, {"ticker": "CEPU", "desc": "CENTRAL PUERTO S.A. ESCRIT. \"B\" 1 V.", "tipo": "Acciones", "pnl": 27.2104, "ops": 1, "dias": 336.0, "retorno_pct": 73.396, "cupones": 0.0, "dividendos": 1.9184, "total": 29.1288}, {"ticker": "IRCOO", "desc": "ON IRSA INVER Y REP C23 V23/10/29 U$S CG", "tipo": "Corporativos - Dólar", "pnl": 26.6834, "ops": 1, "dias": 269.0, "retorno_pct": 6.0, "cupones": 0.0, "dividendos": 0.0, "total": 26.6834}, {"ticker": "MELI", "desc": "CEDEAR MERCADOLIBRE INC.", "tipo": "Cedears", "pnl": 16.8313, "ops": 2, "dias": 141.0, "retorno_pct": 12.3203, "cupones": 0.0, "dividendos": 0.0, "total": 16.8313}, {"ticker": "PAMP", "desc": "PAMPA ENERGIA", "tipo": "Acciones", "pnl": 12.9821, "ops": 2, "dias": 104.0, "retorno_pct": 15.1851, "cupones": 0.0, "dividendos": 0.0, "total": 12.9821}, {"ticker": "YM37O", "desc": "ON YPF CLASE 37 VTO 07/05/27 U$S C.G", "tipo": "Corporativos - Dólar", "pnl": 10.0013, "ops": 2, "dias": 107.5, "retorno_pct": 1.4701, "cupones": 19.9094, "dividendos": 0.0, "total": 29.910700000000002}, {"ticker": "WMT", "desc": "CEDEAR WAL-MART STORES INC. ESCRIT.", "tipo": "Cedears", "pnl": 9.873, "ops": 2, "dias": 37.0, "retorno_pct": 4.1374, "cupones": 0.0, "dividendos": 0.0, "total": 9.873}, {"ticker": "MCD", "desc": "CEDEAR MCDONALDSS CORPORATION ESCRIT.", "tipo": "Cedears", "pnl": 7.6136, "ops": 2, "dias": 19.0, "retorno_pct": 3.8863, "cupones": 0.0, "dividendos": 0.0, "total": 7.6136}, {"ticker": "VIST", "desc": "CEDEAR Vista Energy S.A.B. de C.V (ADS)", "tipo": "Cedears", "pnl": 4.257, "ops": 1, "dias": 416.0, "retorno_pct": 3.2178, "cupones": 0.0, "dividendos": 0.0, "total": 4.257}, {"ticker": "BPOC7", "desc": "BOPREAL S. 1 C VTO31/10/27 U$S CG", "tipo": "Bonos - Dólar", "pnl": 3.7133, "ops": 1, "dias": 5.0, "retorno_pct": 0, "cupones": 0.0, "dividendos": 0.0, "total": 3.7133}, {"ticker": "QQQ", "desc": "CEDEAR INVESCO QQQ TRUST", "tipo": "Cedears", "pnl": 3.3051, "ops": 1, "dias": 34.0, "retorno_pct": 4.0048, "cupones": 0.0, "dividendos": 0.0015, "total": 3.3066}, {"ticker": "YM41O", "desc": "ON YPF CL.41 08/01/27 USD", "tipo": "Corporativos - Dólar", "pnl": 2.936, "ops": 1, "dias": 112.0, "retorno_pct": 1.2, "cupones": 17.1629, "dividendos": 0.0, "total": 20.0989}, {"ticker": "BCMMA", "desc": "Money Market Clase A", "tipo": "Fondos", "pnl": 2.8626, "ops": 3, "dias": 5.6667, "retorno_pct": 0.9502, "cupones": 0.0, "dividendos": 0.0, "total": 2.8626}, {"ticker": "YMCHO", "desc": "ON YPF S.A. REGS 4% V.12/02/2026 (DTC)", "tipo": "Corporativos - Dólar", "pnl": 2.7478, "ops": 2, "dias": 19.0, "retorno_pct": 1.1729, "cupones": 0.0, "dividendos": 0.0, "total": 2.7478}, {"ticker": "GGALX", "desc": "GRUPO FINAC.GALICIA CUP SUSCRIP \"B\" 1V", "tipo": "Acciones", "pnl": 2.2353, "ops": 1, "dias": 0.0, "retorno_pct": 0, "cupones": 0.0, "dividendos": 0.0, "total": 2.2353}, {"ticker": "GLOB", "desc": "CEDEAR GLOBANT S.A.", "tipo": "Cedears", "pnl": 1.3501, "ops": 1, "dias": 3.0, "retorno_pct": 1.7309, "cupones": 0.0, "dividendos": 0.0, "total": 1.3501}, {"ticker": "BCMMUSDA", "desc": "Balanz Money Market USD Clase A", "tipo": "Fondos", "pnl": 0.3788, "ops": 1, "dias": 15.0, "retorno_pct": 0.1157, "cupones": 0.0, "dividendos": 0.0, "total": 0.3788}, {"ticker": "MSFT", "desc": "CEDEAR MICROSOFT CORP. ESCRIT.", "tipo": "Cedears", "pnl": 0.0655, "ops": 2, "dias": 18.0, "retorno_pct": 0.9809, "cupones": 0.0, "dividendos": 0.0, "total": 0.0655}, {"ticker": "META", "desc": "CEDEAR META PLATFORMS INC.", "tipo": "Cedears", "pnl": -1.6794, "ops": 2, "dias": 26.0, "retorno_pct": -0.5758, "cupones": 0.0, "dividendos": 0.0, "total": -1.6794}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "tipo": "Cedears", "pnl": -2.2235, "ops": 9, "dias": 91.4444, "retorno_pct": -3.2003, "cupones": 0.0, "dividendos": 0.0019, "total": -2.2216}, {"ticker": "CRCEO", "desc": "ON CELULOSA ARG CL. 13 U$S V.01/10/25 CG", "tipo": "Corporativos - Dólar", "pnl": -2.5085, "ops": 2, "dias": 8.5, "retorno_pct": -0.3483, "cupones": 0.0, "dividendos": 0.0, "total": -2.5085}, {"ticker": "S29G5", "desc": "LT REP ARGENTINA CAP V29/08/25 $ CG", "tipo": "Letras - ARS", "pnl": -2.7015, "ops": 1, "dias": 7.0, "retorno_pct": -0.6157, "cupones": 0.0, "dividendos": 0.0, "total": -2.7015}, {"ticker": "AAPL", "desc": "CEDEAR APPLE INC.", "tipo": "Cedears", "pnl": -4.5844, "ops": 1, "dias": 28.0, "retorno_pct": -1.7289, "cupones": 0.0, "dividendos": 0.0, "total": -4.5844}, {"ticker": "CAT", "desc": "CEDEAR CATERPILLAR INC. ESCRIT.", "tipo": "Cedears", "pnl": -6.7197, "ops": 2, "dias": 56.0, "retorno_pct": 0.1742, "cupones": 0.0, "dividendos": 0.0009, "total": -6.7188}, {"ticker": "HJCFO", "desc": "ON JOHN DEERE CRED CL14 V21/10/26 U$S CG", "tipo": "Corporativos - Dólar", "pnl": -13.0893, "ops": 1, "dias": 75.0, "retorno_pct": 0.0, "cupones": 0.0, "dividendos": 0.0, "total": -13.0893}, {"ticker": "AMZN", "desc": "CEDEAR AMAZON.COM, INC", "tipo": "Cedears", "pnl": -16.1615, "ops": 2, "dias": 28.0, "retorno_pct": -3.3976, "cupones": 0.0, "dividendos": 0.0, "total": -16.1615}, {"ticker": "YMCJO", "desc": "ON YPF S.A. REGS 1,5% V.30/09/2033 (DTC)", "tipo": "Corporativos - Dólar", "pnl": -20.9804, "ops": 3, "dias": 175.3333, "retorno_pct": 1.2793, "cupones": 49.1713, "dividendos": 0.0, "total": 28.190900000000003}, {"ticker": "BRKB", "desc": "CEDEAR BERKSHIRE HATHAWAY INC.", "tipo": "Cedears", "pnl": -22.2127, "ops": 4, "dias": 105.0, "retorno_pct": -2.4202, "cupones": 0.0, "dividendos": 0.0, "total": -22.2127}, {"ticker": "GLD", "desc": "CEDEAR ETF SPDR GOLD TRUST", "tipo": "Cedears", "pnl": -22.9102, "ops": 1, "dias": 101.0, "retorno_pct": -5.6761, "cupones": 0.0, "dividendos": 0.0, "total": -22.9102}, {"ticker": "YM35O", "desc": "ON YPF CLASE 35  VTO 27/02/27 U$S C.G", "tipo": "Corporativos - Dólar", "pnl": -24.3161, "ops": 7, "dias": 76.2857, "retorno_pct": -0.1227, "cupones": 10.5313, "dividendos": 0.0, "total": -13.784799999999999}, {"ticker": "MGCHO", "desc": "ON PAMPA E CL. 16 V04/11/25 U$S  CG", "tipo": "Corporativos - Dólar", "pnl": -33.1729, "ops": 2, "dias": 50.5, "retorno_pct": -3.9137, "cupones": 12.9731, "dividendos": 0.0, "total": -20.199799999999996}, {"ticker": "NKE", "desc": "CEDEAR NIKE INC. ESC.", "tipo": "Cedears", "pnl": -36.2107, "ops": 2, "dias": 56.0, "retorno_pct": -8.4669, "cupones": 0.0, "dividendos": 0.0, "total": -36.2107}, {"ticker": "S12S5", "desc": "LETRAS DEL TESORO CAP $ V 12/09/25", "tipo": "Letras - ARS", "pnl": -38.5298, "ops": 1, "dias": 11.0, "retorno_pct": -5.2157, "cupones": 0.0, "dividendos": 0.0, "total": -38.5298}, {"ticker": "DNC3O", "desc": "ON EDENOR CL.3 V.22/11/26 U$S CG", "tipo": "Corporativos - Dólar", "pnl": -43.1526, "ops": 9, "dias": 468.4444, "retorno_pct": -0.6949, "cupones": 231.9681, "dividendos": 0.0, "total": 188.8155}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "tipo": "Cedears", "pnl": -77.9602, "ops": 10, "dias": 137.2, "retorno_pct": -6.3855, "cupones": 0.0, "dividendos": 0.0001, "total": -77.9601}, {"ticker": "MRCAO", "desc": "ON GM/CTR REGS 9,625% V.01/12/2027", "tipo": "Corporativos - Dólar", "pnl": -85.4802, "ops": 5, "dias": 169.6, "retorno_pct": -11.2624, "cupones": 23.6419, "dividendos": 0.0, "total": -61.8383}, {"ticker": "GNCXO", "desc": "ON GENNEIA SA REGS 8,75% V.02/09/2027", "tipo": "Corporativos - Dólar", "pnl": -332.0014, "ops": 2, "dias": 324.0, "retorno_pct": -23.261, "cupones": 68.302, "dividendos": 0.0, "total": -263.69939999999997}, {"ticker": "BPO28", "desc": "BOPREAL S.4 VTO31/10/28 U$S CG", "tipo": "Bonos - Dólar Link", "pnl": -1055.8773, "ops": 2, "dias": 62.5, "retorno_pct": -100.0, "cupones": 0.0, "dividendos": 0.0, "total": -1055.8773}];
+var TIPOS=[{"tipo": "Acciones", "pnl": 844.8901, "ops": 39}, {"tipo": "Bonos - Dólar", "pnl": 1727.2115, "ops": 34}, {"tipo": "Bonos - Dólar Link", "pnl": -1055.8773, "ops": 2}, {"tipo": "Cedears", "pnl": -147.3666, "ops": 44}, {"tipo": "Corporativos - Dólar", "pnl": -263.8353, "ops": 47}, {"tipo": "Fondos", "pnl": 171.4239, "ops": 13}, {"tipo": "Letras - ARS", "pnl": -41.2313, "ops": 2}];
+var HELD=[{"ticker": "AL30", "desc": "BONO REP. ARGENTINA USD STEP UP 2030", "tipo": "Bonos - Dólar", "cantidad": 3479.0, "costo_usd": 2119.4068}, {"ticker": "AMZN", "desc": "CEDEAR AMAZON.COM, INC", "tipo": "Cedears", "cantidad": 978.0, "costo_usd": 1612.6917}, {"ticker": "BAHUSDA", "desc": "Corporativo Clase A", "tipo": "Fondos", "cantidad": 1595.22, "costo_usd": 2195.38}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "tipo": "Acciones", "cantidad": 117.0, "costo_usd": 521.6788}, {"ticker": "BPOA8", "desc": "BOPREAL 4A VTO31/10/28 U$S CG", "tipo": "Bonos - Dólar Link", "cantidad": 433.0, "costo_usd": 0.0}, {"ticker": "BPOB8", "desc": "BOPREAL 4B VTO31/10/28 U$S CG", "tipo": "Bonos - Dólar Link", "cantidad": 866.0, "costo_usd": 0.0}, {"ticker": "CEPU", "desc": "CENTRAL PUERTO S.A. ESCRIT. \"B\" 1 V.", "tipo": "Acciones", "cantidad": 592.0, "costo_usd": 645.7547}, {"ticker": "CS50O", "desc": "ON CRESUD S.34 CL.L 10/03/29 USD", "tipo": "Corporativos - Dólar", "cantidad": 1056.0, "costo_usd": 1056.0}, {"ticker": "EWZ", "desc": "CEDEAR ISHARES MSCI BRAZIL CAP", "tipo": "Cedears", "cantidad": 164.0, "costo_usd": 2135.9386}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "tipo": "Bonos - Dólar", "cantidad": 1857.0, "costo_usd": 1223.6164}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "tipo": "Acciones", "cantidad": 202.0, "costo_usd": 1080.0022}, {"ticker": "GLOB", "desc": "CEDEAR GLOBANT S.A.", "tipo": "Cedears", "cantidad": 87.0, "costo_usd": 960.5082}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "tipo": "Cedears", "cantidad": 415.0, "costo_usd": 1406.535}, {"ticker": "IEUR", "desc": "CEDEAR ISHARES CORE MSCI EUROPE ETF", "tipo": "Cedears", "cantidad": 177.0, "costo_usd": 1033.8905}, {"ticker": "LOMA", "desc": "ACC.ORD. LOMA NEGRA S.A. 1 VOTO $ ESC.", "tipo": "Acciones", "cantidad": 448.0, "costo_usd": 851.5533}, {"ticker": "LUC5O", "desc": "ON LUZ DE TRES PICOS CL.5 26/02/29 USD", "tipo": "Corporativos - Dólar", "cantidad": 1500.0, "costo_usd": 1500.0}, {"ticker": "MCC1O", "desc": "ON PECOM S.1 V.10/03/29 U$S CG", "tipo": "Corporativos - Dólar", "cantidad": 1000.0, "costo_usd": 1000.0}, {"ticker": "MELI", "desc": "CEDEAR MERCADOLIBRE INC.", "tipo": "Cedears", "cantidad": 88.0, "costo_usd": 1395.8326}, {"ticker": "MGCQO", "desc": "ON PAMPA ENERGIA CL.25 V06/08/28 U$S CG", "tipo": "Corporativos - Dólar", "cantidad": 1000.0, "costo_usd": 1000.0}, {"ticker": "OTS6O", "desc": "ON OTAMERICA EBYTEM S.6 29/07/29 USD", "tipo": "Corporativos - Dólar", "cantidad": 1163.0, "costo_usd": 1163.0}, {"ticker": "OZC3O", "desc": "ON EDEMSA CL.3 V29/11/27 U$S CG", "tipo": "Corporativos - Dólar", "cantidad": 1363.0, "costo_usd": 1362.5059}, {"ticker": "PAMP", "desc": "PAMPA ENERGIA", "tipo": "Acciones", "cantidad": 571.0, "costo_usd": 1645.3959}, {"ticker": "QQQ", "desc": "CEDEAR INVESCO QQQ TRUST", "tipo": "Cedears", "cantidad": 73.0, "costo_usd": 2277.6173}, {"ticker": "SBC2O", "desc": "ON SCANIA CREDIT ARGENTINA CL.2 16/01/29 USD", "tipo": "Corporativos - Dólar", "cantidad": 2018.0, "costo_usd": 2018.0}, {"ticker": "SPY", "desc": "CEDEAR SPDR S&P 500", "tipo": "Cedears", "cantidad": 64.0, "costo_usd": 1850.6387}, {"ticker": "TXAR", "desc": "TERNIUM ARG S.A.ORDS.\"A\"1 VOTO ESC", "tipo": "Acciones", "cantidad": 1428.0, "costo_usd": 692.6414}, {"ticker": "VIST", "desc": "CEDEAR Vista Energy S.A.B. de C.V (ADS)", "tipo": "Cedears", "cantidad": 113.0, "costo_usd": 2062.4284}, {"ticker": "YPFD", "desc": "YPF S.A. ESCRIT. \"D\" 1 VOTO", "tipo": "Acciones", "cantidad": 55.0, "costo_usd": 1622.4067}];
+var TRADES=[{"ticker": "GLOB", "desc": "CEDEAR GLOBANT S.A.", "tipo": "Cedears", "fecha_compra": "2024-03-08", "fecha_venta": "2024-03-11", "cantidad": 12.0, "pc": 12.3705, "pv": 12.5846, "gastos": 1.2193, "pnl": 1.3501, "dias": 3.0, "ret_pct": 1.7309}, {"ticker": "CRCEO", "desc": "ON CELULOSA ARG CL. 13 U$S V.01/10/25 CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-03-08", "fecha_venta": "2024-03-19", "cantidad": 475.0, "pc": 0.3827, "pv": 0.38, "gastos": 0.9216, "pnl": -2.1879, "dias": 11.0, "ret_pct": -0.6966}, {"ticker": "CRCEO", "desc": "ON CELULOSA ARG CL. 13 U$S V.01/10/25 CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-03-13", "fecha_venta": "2024-03-19", "cantidad": 84.0, "pc": 0.38, "pv": 0.38, "gastos": 0.3207, "pnl": -0.3207, "dias": 6.0, "ret_pct": 0.0}, {"ticker": "YMCHO", "desc": "ON YPF S.A. REGS 4% V.12/02/2026 (DTC)", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-03-08", "fecha_venta": "2024-03-19", "cantidad": 1161.0, "pc": 0.6498, "pv": 0.655, "gastos": 3.8988, "pnl": 2.1027, "dias": 11.0, "ret_pct": 0.7955}, {"ticker": "YMCHO", "desc": "ON YPF S.A. REGS 4% V.12/02/2026 (DTC)", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-02-21", "fecha_venta": "2024-03-19", "cantidad": 169.0, "pc": 0.645, "pv": 0.655, "gastos": 1.045, "pnl": 0.645, "dias": 27.0, "ret_pct": 1.5504}, {"ticker": "QQQ", "desc": "CEDEAR INVESCO QQQ TRUST", "tipo": "Cedears", "fecha_compra": "2024-03-01", "fecha_venta": "2024-04-04", "cantidad": 6.0, "pc": 23.2697, "pv": 24.2016, "gastos": 2.2864, "pnl": 3.3051, "dias": 34.0, "ret_pct": 4.0048}, {"ticker": "MELI", "desc": "CEDEAR MERCADOLIBRE INC.", "tipo": "Cedears", "fecha_compra": "2024-03-08", "fecha_venta": "2024-04-05", "cantidad": 9.0, "pc": 13.2345, "pv": 13.0645, "gastos": 0.9621, "pnl": -2.4928, "dias": 28.0, "ret_pct": -1.2851}, {"ticker": "AAPL", "desc": "CEDEAR APPLE INC.", "tipo": "Cedears", "fecha_compra": "2024-03-08", "fecha_venta": "2024-04-05", "cantidad": 20.0, "pc": 9.0492, "pv": 8.8928, "gastos": 1.4554, "pnl": -4.5844, "dias": 28.0, "ret_pct": -1.7289}, {"ticker": "MSFT", "desc": "CEDEAR MICROSOFT CORP. ESCRIT.", "tipo": "Cedears", "fecha_compra": "2024-04-05", "fecha_venta": "2024-04-09", "cantidad": 7.0, "pc": 14.8856, "pv": 14.6639, "gastos": 1.7035, "pnl": -3.2556, "dias": 4.0, "ret_pct": -1.4896}, {"ticker": "MSFT", "desc": "CEDEAR MICROSOFT CORP. ESCRIT.", "tipo": "Cedears", "fecha_compra": "2024-03-08", "fecha_venta": "2024-04-09", "cantidad": 9.0, "pc": 14.1747, "pv": 14.6639, "gastos": 1.0819, "pnl": 3.3211, "dias": 32.0, "ret_pct": 3.4514}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "tipo": "Bonos - Dólar", "fecha_compra": "2024-03-08", "fecha_venta": "2024-04-16", "cantidad": 378.0, "pc": 0.4042, "pv": 0.4456, "gastos": 1.05, "pnl": 14.6056, "dias": 39.0, "ret_pct": 10.2466}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "tipo": "Cedears", "fecha_compra": "2024-03-08", "fecha_venta": "2024-04-18", "cantidad": 6.0, "pc": 38.4699, "pv": 36.4956, "gastos": 1.8298, "pnl": -13.6756, "dias": 41.0, "ret_pct": -5.1321}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "tipo": "Cedears", "fecha_compra": "2024-03-27", "fecha_venta": "2024-04-19", "cantidad": 2.0, "pc": 41.2543, "pv": 35.0882, "gastos": 1.2721, "pnl": -13.6043, "dias": 23.0, "ret_pct": -14.9466}, {"ticker": "AMZN", "desc": "CEDEAR AMAZON.COM, INC", "tipo": "Cedears", "fecha_compra": "2024-03-08", "fecha_venta": "2024-04-19", "cantidad": 88.0, "pc": 1.2787, "pv": 1.2691, "gastos": 0.9371, "pnl": -1.7847, "dias": 42.0, "ret_pct": -0.7533}, {"ticker": "AMZN", "desc": "CEDEAR AMAZON.COM, INC", "tipo": "Cedears", "fecha_compra": "2024-04-05", "fecha_venta": "2024-04-19", "cantidad": 139.0, "pc": 1.3507, "pv": 1.2691, "gastos": 3.0332, "pnl": -14.3767, "dias": 14.0, "ret_pct": -6.0419}, {"ticker": "META", "desc": "CEDEAR META PLATFORMS INC.", "tipo": "Cedears", "fecha_compra": "2024-03-08", "fecha_venta": "2024-04-19", "cantidad": 6.0, "pc": 22.1135, "pv": 21.1188, "gastos": 1.0633, "pnl": -7.0313, "dias": 42.0, "ret_pct": -4.498}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "tipo": "Cedears", "fecha_compra": "2024-03-08", "fecha_venta": "2024-04-19", "cantidad": 2.0, "pc": 38.4699, "pv": 35.0882, "gastos": 0.5889, "pnl": -7.3524, "dias": 42.0, "ret_pct": -8.7907}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "tipo": "Cedears", "fecha_compra": "2024-03-11", "fecha_venta": "2024-04-19", "cantidad": 3.0, "pc": 37.7261, "pv": 35.0882, "gastos": 1.8313, "pnl": -9.7452, "dias": 39.0, "ret_pct": -6.9924}, {"ticker": "BPOD7", "desc": "BOPREAL S. 1 D VTO31/10/27 U$S CG", "tipo": "Bonos - Dólar", "fecha_compra": "2024-04-19", "fecha_venta": "2024-04-22", "cantidad": 216.0, "pc": 0.7632, "pv": 0.7716, "gastos": 1.9906, "pnl": -0.187, "dias": 3.0, "ret_pct": 1.094}, {"ticker": "PAMP", "desc": "PAMPA ENERGIA", "tipo": "Acciones", "fecha_compra": "2024-03-08", "fecha_venta": "2024-05-02", "cantidad": 26.0, "pc": 1.6714, "pv": 1.9688, "gastos": 0.446, "pnl": 7.2857, "dias": 55.0, "ret_pct": 17.7917}, {"ticker": "AL30", "desc": "BONO REP. ARGENTINA USD STEP UP 2030", "tipo": "Bonos - Dólar", "fecha_compra": "2024-03-08", "fecha_venta": "2024-05-28", "cantidad": 1195.0, "pc": 0.4685, "pv": 0.5524, "gastos": 4.7696, "pnl": 95.4726, "dias": 81.0, "ret_pct": 17.9044}, {"ticker": "MGCHO", "desc": "ON PAMPA E CL. 16 V04/11/25 U$S  CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-04-22", "fecha_venta": "2024-06-10", "cantidad": 160.0, "pc": 1.028, "pv": 0.9894, "gastos": 1.8323, "pnl": -8.0111, "dias": 49.0, "ret_pct": -3.7565}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "tipo": "Acciones", "fecha_compra": "2024-04-09", "fecha_venta": "2024-06-10", "cantidad": 21.0, "pc": 3.2594, "pv": 3.1848, "gastos": 1.2668, "pnl": -2.8326, "dias": 62.0, "ret_pct": -2.2876}, {"ticker": "MGCHO", "desc": "ON PAMPA E CL. 16 V04/11/25 U$S  CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-04-19", "fecha_venta": "2024-06-10", "cantidad": 471.0, "pc": 1.0314, "pv": 0.9894, "gastos": 5.3866, "pnl": -25.1618, "dias": 52.0, "ret_pct": -4.0708}, {"ticker": "TGSU2", "desc": "T. DE GAS DEL SUR ESC. \"B\" 1 V.", "tipo": "Acciones", "fecha_compra": "2024-03-01", "fecha_venta": "2024-06-10", "cantidad": 6.0, "pc": 2.7931, "pv": 3.4837, "gastos": 0.3485, "pnl": 3.7949, "dias": 101.0, "ret_pct": 24.7237}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "tipo": "Acciones", "fecha_compra": "2024-03-08", "fecha_venta": "2024-06-10", "cantidad": 54.0, "pc": 2.3443, "pv": 3.2124, "gastos": 1.8182, "pnl": 45.0591, "dias": 94.0, "ret_pct": 37.0305}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "tipo": "Cedears", "fecha_compra": "2024-03-21", "fecha_venta": "2024-06-24", "cantidad": 3.0, "pc": 2.73, "pv": 3.1221, "gastos": 0.1547, "pnl": 1.0216, "dias": 95.0, "ret_pct": 14.3629}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "tipo": "Cedears", "fecha_compra": "2024-04-04", "fecha_venta": "2024-06-24", "cantidad": 34.0, "pc": 2.8759, "pv": 3.1221, "gastos": 1.9451, "pnl": 6.4249, "dias": 81.0, "ret_pct": 8.5599}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "tipo": "Cedears", "fecha_compra": "2024-03-08", "fecha_venta": "2024-06-24", "cantidad": 58.0, "pc": 2.4538, "pv": 3.1221, "gastos": 1.9268, "pnl": 36.8368, "dias": 108.0, "ret_pct": 27.2372}, {"ticker": "YMCJO", "desc": "ON YPF S.A. REGS 1,5% V.30/09/2033 (DTC)", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-03-21", "fecha_venta": "2024-07-29", "cantidad": 550.0, "pc": 0.974, "pv": 0.9316, "gastos": 5.4525, "pnl": -28.7613, "dias": 130.0, "ret_pct": -4.3511}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "tipo": "Acciones", "fecha_compra": "2024-04-09", "fecha_venta": "2024-08-08", "cantidad": 12.0, "pc": 3.2594, "pv": 2.9215, "gastos": 0.7025, "pnl": -4.7573, "dias": 121.0, "ret_pct": -10.3668}, {"ticker": "PAMP", "desc": "PAMPA ENERGIA", "tipo": "Acciones", "fecha_compra": "2024-03-08", "fecha_venta": "2024-08-08", "cantidad": 30.0, "pc": 1.6714, "pv": 1.8816, "gastos": 0.6108, "pnl": 5.6964, "dias": 153.0, "ret_pct": 12.5785}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "tipo": "Acciones", "fecha_compra": "2024-03-08", "fecha_venta": "2024-08-08", "cantidad": 9.0, "pc": 2.3443, "pv": 2.9998, "gastos": 0.2921, "pnl": 5.6076, "dias": 153.0, "ret_pct": 27.9626}, {"ticker": "BCMMA", "desc": "Money Market Clase A", "tipo": "Fondos", "fecha_compra": "2024-08-19", "fecha_venta": "2024-08-26", "cantidad": 20838.7148, "pc": 0.0056, "pv": 0.0056, "gastos": 0.0, "pnl": 1.5278, "dias": 7.0, "ret_pct": 1.3148}, {"ticker": "BCMMA", "desc": "Money Market Clase A", "tipo": "Fondos", "fecha_compra": "2024-08-19", "fecha_venta": "2024-08-28", "cantidad": 20838.7186, "pc": 0.0056, "pv": 0.0057, "gastos": 0.0, "pnl": 1.8923, "dias": 9.0, "ret_pct": 1.6285}, {"ticker": "EQUITYSA", "desc": "Equity Selection Clase A", "tipo": "Fondos", "fecha_compra": "2024-08-26", "fecha_venta": "2024-09-09", "cantidad": 15940.9242, "pc": 0.0067, "pv": 0.0077, "gastos": 0.0, "pnl": 16.518, "dias": 14.0, "ret_pct": 15.5074}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "tipo": "Cedears", "fecha_compra": "2024-07-15", "fecha_venta": "2024-09-10", "cantidad": 8.0, "pc": 3.275, "pv": 2.6006, "gastos": 0.3169, "pnl": -5.7122, "dias": 57.0, "ret_pct": -20.5928}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "tipo": "Cedears", "fecha_compra": "2024-06-11", "fecha_venta": "2024-09-10", "cantidad": 6.0, "pc": 3.08, "pv": 2.6006, "gastos": 0.2297, "pnl": -3.1062, "dias": 91.0, "ret_pct": -15.5654}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "tipo": "Cedears", "fecha_compra": "2024-04-18", "fecha_venta": "2024-09-10", "cantidad": 76.0, "pc": 2.8264, "pv": 2.6006, "gastos": 3.7446, "pnl": -20.9094, "dias": 145.0, "ret_pct": -7.9907}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "tipo": "Cedears", "fecha_compra": "2024-08-01", "fecha_venta": "2024-09-10", "cantidad": 26.0, "pc": 2.9439, "pv": 2.6006, "gastos": 1.1555, "pnl": -10.0806, "dias": 40.0, "ret_pct": -11.6607}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "tipo": "Cedears", "fecha_compra": "2024-07-25", "fecha_venta": "2024-09-10", "cantidad": 4.0, "pc": 3.0092, "pv": 2.6006, "gastos": 0.1785, "pnl": -1.813, "dias": 47.0, "ret_pct": -13.5792}, {"ticker": "AL30", "desc": "BONO REP. ARGENTINA USD STEP UP 2030", "tipo": "Bonos - Dólar", "fecha_compra": "2024-03-08", "fecha_venta": "2024-09-10", "cantidad": 3659.0, "pc": 0.4685, "pv": 0.5623, "gastos": 11.8924, "pnl": 331.2661, "dias": 186.0, "ret_pct": 20.0174}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "tipo": "Cedears", "fecha_compra": "2024-04-04", "fecha_venta": "2024-09-10", "cantidad": 15.0, "pc": 2.8759, "pv": 2.6006, "gastos": 0.7551, "pnl": -4.8853, "dias": 159.0, "ret_pct": -9.5741}, {"ticker": "EQUITYSA", "desc": "Equity Selection Clase A", "tipo": "Fondos", "fecha_compra": "2024-08-26", "fecha_venta": "2024-09-23", "cantidad": 1677.5215, "pc": 0.0067, "pv": 0.0081, "gastos": 0.0, "pnl": 2.305, "dias": 28.0, "ret_pct": 20.563}, {"ticker": "EQUITYSA", "desc": "Equity Selection Clase A", "tipo": "Fondos", "fecha_compra": "2024-09-02", "fecha_venta": "2024-09-23", "cantidad": 8602.9472, "pc": 0.0074, "pv": 0.0081, "gastos": 0.0, "pnl": 5.9006, "dias": 21.0, "ret_pct": 9.3062}, {"ticker": "MRCAO", "desc": "ON GM/CTR REGS 9,625% V.01/12/2027", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-05-07", "fecha_venta": "2024-10-14", "cantidad": 19.0, "pc": 0.83, "pv": 0.7421, "gastos": 0.1552, "pnl": -1.8253, "dias": 160.0, "ret_pct": -10.5904}, {"ticker": "MRCAO", "desc": "ON GM/CTR REGS 9,625% V.01/12/2027", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-04-30", "fecha_venta": "2024-10-14", "cantidad": 446.0, "pc": 0.8228, "pv": 0.7421, "gastos": 4.0904, "pnl": -40.099, "dias": 167.0, "ret_pct": -9.812}, {"ticker": "MRCAO", "desc": "ON GM/CTR REGS 9,625% V.01/12/2027", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-03-27", "fecha_venta": "2024-10-14", "cantidad": 153.0, "pc": 0.8874, "pv": 0.7421, "gastos": 1.492, "pnl": -23.729, "dias": 201.0, "ret_pct": -16.3775}, {"ticker": "MRCAO", "desc": "ON GM/CTR REGS 9,625% V.01/12/2027", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-05-28", "fecha_venta": "2024-10-14", "cantidad": 1.0, "pc": 0.8134, "pv": 0.7421, "gastos": 0.0085, "pnl": -0.0799, "dias": 139.0, "ret_pct": -8.77}, {"ticker": "YMCJO", "desc": "ON YPF S.A. REGS 1,5% V.30/09/2033 (DTC)", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-04-08", "fecha_venta": "2024-10-14", "cantidad": 40.0, "pc": 0.9395, "pv": 0.9956, "gastos": 0.443, "pnl": 1.801, "dias": 189.0, "ret_pct": 5.9713}, {"ticker": "EQUITYSA", "desc": "Equity Selection Clase A", "tipo": "Fondos", "fecha_compra": "2024-09-02", "fecha_venta": "2024-10-14", "cantidad": 10188.2939, "pc": 0.0074, "pv": 0.0086, "gastos": 0.0, "pnl": 12.8042, "dias": 42.0, "ret_pct": 17.052}, {"ticker": "MRCAO", "desc": "ON GM/CTR REGS 9,625% V.01/12/2027", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-04-16", "fecha_venta": "2024-10-14", "cantidad": 200.0, "pc": 0.8316, "pv": 0.7421, "gastos": 1.8474, "pnl": -19.747, "dias": 181.0, "ret_pct": -10.7622}, {"ticker": "YMCJO", "desc": "ON YPF S.A. REGS 1,5% V.30/09/2033 (DTC)", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-03-21", "fecha_venta": "2024-10-14", "cantidad": 541.0, "pc": 0.974, "pv": 0.9956, "gastos": 5.7057, "pnl": 5.9799, "dias": 207.0, "ret_pct": 2.2177}, {"ticker": "AL30", "desc": "BONO REP. ARGENTINA USD STEP UP 2030", "tipo": "Bonos - Dólar", "fecha_compra": "2024-10-15", "fecha_venta": "2024-10-16", "cantidad": 79.0, "pc": 0.634, "pv": 0.6382, "gastos": 0.5583, "pnl": -0.2234, "dias": 1.0, "ret_pct": 0.6686}, {"ticker": "GD30", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/30", "tipo": "Bonos - Dólar", "fecha_compra": "2024-09-10", "fecha_venta": "2024-10-16", "cantidad": 37.0, "pc": 0.5709, "pv": 0.6557, "gastos": 0.2191, "pnl": 2.9185, "dias": 36.0, "ret_pct": 14.8537}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "tipo": "Bonos - Dólar", "fecha_compra": "2024-03-08", "fecha_venta": "2024-10-17", "cantidad": 13.0, "pc": 0.4042, "pv": 0.5561, "gastos": 0.0386, "pnl": 1.936, "dias": 223.0, "ret_pct": 37.5793}, {"ticker": "MCD", "desc": "CEDEAR MCDONALDSS CORPORATION ESCRIT.", "tipo": "Cedears", "fecha_compra": "2024-10-03", "fecha_venta": "2024-10-21", "cantidad": 22.0, "pc": 13.0853, "pv": 13.4858, "gastos": 4.7525, "pnl": 4.0602, "dias": 18.0, "ret_pct": 3.0613}, {"ticker": "DNC5O", "desc": "ON EDENOR CL.5 V.05/08/28 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-08-01", "fecha_venta": "2024-10-21", "cantidad": 512.0, "pc": 1.0, "pv": 1.0735, "gastos": 4.6932, "pnl": 32.9388, "dias": 81.0, "ret_pct": 7.35}, {"ticker": "MCD", "desc": "CEDEAR MCDONALDSS CORPORATION ESCRIT.", "tipo": "Cedears", "fecha_compra": "2024-10-01", "fecha_venta": "2024-10-21", "cantidad": 9.0, "pc": 12.8791, "pv": 13.4858, "gastos": 1.9074, "pnl": 3.5534, "dias": 20.0, "ret_pct": 4.7112}, {"ticker": "EQUITYSA", "desc": "Equity Selection Clase A", "tipo": "Fondos", "fecha_compra": "2024-09-02", "fecha_venta": "2024-10-21", "cantidad": 10080.5598, "pc": 0.0074, "pv": 0.0085, "gastos": 0.0, "pnl": 11.7388, "dias": 49.0, "ret_pct": 15.8002}, {"ticker": "EQUITYSA", "desc": "Equity Selection Clase A", "tipo": "Fondos", "fecha_compra": "2024-09-02", "fecha_venta": "2024-10-28", "cantidad": 9906.053, "pc": 0.0074, "pv": 0.0089, "gastos": 0.0, "pnl": 15.2848, "dias": 56.0, "ret_pct": 20.9355}, {"ticker": "WMT", "desc": "CEDEAR WAL-MART STORES INC. ESCRIT.", "tipo": "Cedears", "fecha_compra": "2024-10-03", "fecha_venta": "2024-11-08", "cantidad": 64.0, "pc": 4.6208, "pv": 4.7974, "gastos": 4.8179, "pnl": 6.4859, "dias": 36.0, "ret_pct": 3.8223}, {"ticker": "WMT", "desc": "CEDEAR WAL-MART STORES INC. ESCRIT.", "tipo": "Cedears", "fecha_compra": "2024-10-01", "fecha_venta": "2024-11-08", "cantidad": 26.0, "pc": 4.5929, "pv": 4.7974, "gastos": 1.93, "pnl": 3.387, "dias": 38.0, "ret_pct": 4.4525}, {"ticker": "BPY26", "desc": "BOPREAL S.3 VTO31/05/26 U$S CG", "tipo": "Bonos - Dólar", "fecha_compra": "2024-10-03", "fecha_venta": "2024-11-14", "cantidad": 600.0, "pc": 0.88, "pv": 0.9533, "gastos": 6.0731, "pnl": 37.9259, "dias": 42.0, "ret_pct": 8.3334}, {"ticker": "BPY26", "desc": "BOPREAL S.3 VTO31/05/26 U$S CG", "tipo": "Bonos - Dólar", "fecha_compra": "2024-05-28", "fecha_venta": "2024-11-14", "cantidad": 800.0, "pc": 0.8102, "pv": 0.9533, "gastos": 7.739, "pnl": 106.7563, "dias": 170.0, "ret_pct": 17.6651}, {"ticker": "NKE", "desc": "CEDEAR NIKE INC. ESC.", "tipo": "Cedears", "fecha_compra": "2024-10-03", "fecha_venta": "2024-11-27", "cantidad": 41.0, "pc": 7.1218, "pv": 6.72, "gastos": 4.3213, "pnl": -20.7939, "dias": 55.0, "ret_pct": -5.6414}, {"ticker": "CAT", "desc": "CEDEAR CATERPILLAR INC. ESCRIT.", "tipo": "Cedears", "fecha_compra": "2024-10-03", "fecha_venta": "2024-11-27", "cantidad": 14.0, "pc": 20.3255, "pv": 20.2, "gastos": 4.3095, "pnl": -6.0667, "dias": 55.0, "ret_pct": -0.6176}, {"ticker": "CAT", "desc": "CEDEAR CATERPILLAR INC. ESCRIT.", "tipo": "Cedears", "fecha_compra": "2024-10-01", "fecha_venta": "2024-11-27", "cantidad": 6.0, "pc": 20.0067, "pv": 20.2, "gastos": 1.8126, "pnl": -0.653, "dias": 57.0, "ret_pct": 0.966}, {"ticker": "NKE", "desc": "CEDEAR NIKE INC. ESC.", "tipo": "Cedears", "fecha_compra": "2024-10-01", "fecha_venta": "2024-11-27", "cantidad": 16.0, "pc": 7.5754, "pv": 6.72, "gastos": 1.7296, "pnl": -15.4167, "dias": 57.0, "ret_pct": -11.2924}, {"ticker": "BPOC7", "desc": "BOPREAL S. 1 C VTO31/10/27 U$S CG", "tipo": "Bonos - Dólar", "fecha_compra": "2024-11-22", "fecha_venta": "2024-11-27", "cantidad": 4.0, "pc": 0.0, "pv": 0.8671, "gastos": -0.2448, "pnl": 3.7133, "dias": 5.0, "ret_pct": 0}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "tipo": "Bonos - Dólar", "fecha_compra": "2024-03-08", "fecha_venta": "2024-11-27", "cantidad": 295.0, "pc": 0.4042, "pv": 0.6678, "gastos": 1.1903, "pnl": 76.5585, "dias": 264.0, "ret_pct": 65.2037}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "tipo": "Bonos - Dólar", "fecha_compra": "2024-03-08", "fecha_venta": "2024-11-28", "cantidad": 532.0, "pc": 0.4042, "pv": 0.667, "gastos": 2.166, "pnl": 137.6418, "dias": 265.0, "ret_pct": 65.016}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "tipo": "Bonos - Dólar", "fecha_compra": "2024-03-08", "fecha_venta": "2024-11-28", "cantidad": 518.0, "pc": 0.4042, "pv": 0.6667, "gastos": 2.1019, "pnl": 133.8713, "dias": 265.0, "ret_pct": 64.9417}, {"ticker": "META", "desc": "CEDEAR META PLATFORMS INC.", "tipo": "Cedears", "fecha_compra": "2024-12-02", "fecha_venta": "2024-12-12", "cantidad": 12.0, "pc": 25.4, "pv": 26.25, "gastos": 4.8481, "pnl": 5.3519, "dias": 10.0, "ret_pct": 3.3465}, {"ticker": "HJCFO", "desc": "ON JOHN DEERE CRED CL14 V21/10/26 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-10-16", "fecha_venta": "2024-12-30", "cantidad": 1253.0, "pc": 1.0, "pv": 1.0, "gastos": 13.0893, "pnl": -13.0893, "dias": 75.0, "ret_pct": 0.0}, {"ticker": "BRKB", "desc": "CEDEAR BERKSHIRE HATHAWAY INC.", "tipo": "Cedears", "fecha_compra": "2024-11-25", "fecha_venta": "2025-01-22", "cantidad": 3.0, "pc": 22.8, "pv": 21.0791, "gastos": 1.0904, "pnl": -6.2531, "dias": 58.0, "ret_pct": -7.5478}, {"ticker": "BRKB", "desc": "CEDEAR BERKSHIRE HATHAWAY INC.", "tipo": "Cedears", "fecha_compra": "2024-10-03", "fecha_venta": "2025-01-22", "cantidad": 14.0, "pc": 21.3397, "pv": 21.0791, "gastos": 4.8411, "pnl": -8.4895, "dias": 111.0, "ret_pct": -1.2212}, {"ticker": "BRKB", "desc": "CEDEAR BERKSHIRE HATHAWAY INC.", "tipo": "Cedears", "fecha_compra": "2024-09-27", "fecha_venta": "2025-01-22", "cantidad": 3.0, "pc": 21.2377, "pv": 21.0791, "gastos": 1.028, "pnl": -1.5038, "dias": 117.0, "ret_pct": -0.7469}, {"ticker": "BRKB", "desc": "CEDEAR BERKSHIRE HATHAWAY INC.", "tipo": "Cedears", "fecha_compra": "2024-09-10", "fecha_venta": "2025-01-22", "cantidad": 16.0, "pc": 21.1139, "pv": 21.0791, "gastos": 5.4095, "pnl": -5.9664, "dias": 134.0, "ret_pct": -0.1649}, {"ticker": "GGALX", "desc": "GRUPO FINAC.GALICIA CUP SUSCRIP \"B\" 1V", "tipo": "Acciones", "fecha_compra": "2025-01-28", "fecha_venta": "2025-01-28", "cantidad": 187.0, "pc": 0.0, "pv": 0.0121, "gastos": 0.0185, "pnl": 2.2353, "dias": 0.0, "ret_pct": 0}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "tipo": "Acciones", "fecha_compra": "2024-03-27", "fecha_venta": "2025-02-07", "cantidad": 17.0, "pc": 2.8347, "pv": 6.7742, "gastos": 1.5328, "pnl": 65.4392, "dias": 317.0, "ret_pct": 138.9761}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "tipo": "Acciones", "fecha_compra": "2024-04-30", "fecha_venta": "2025-02-07", "cantidad": 20.0, "pc": 3.41, "pv": 7.5467, "gastos": 1.9856, "pnl": 80.7474, "dias": 283.0, "ret_pct": 121.3087}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "tipo": "Acciones", "fecha_compra": "2024-04-30", "fecha_venta": "2025-02-07", "cantidad": 6.0, "pc": 3.4397, "pv": 6.7742, "gastos": 0.5534, "pnl": 19.4537, "dias": 283.0, "ret_pct": 96.942}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "fecha_compra": "2024-03-08", "fecha_venta": "2025-02-07", "cantidad": 106.0, "pc": 0.8401, "pv": 1.2581, "gastos": 1.3062, "pnl": 42.9972, "dias": 336.0, "ret_pct": 49.7501}, {"ticker": "CEPU", "desc": "CENTRAL PUERTO S.A. ESCRIT. \"B\" 1 V.", "tipo": "Acciones", "fecha_compra": "2024-03-08", "fecha_venta": "2025-02-07", "cantidad": 46.0, "pc": 0.825, "pv": 1.4306, "gastos": 0.6446, "pnl": 27.2104, "dias": 336.0, "ret_pct": 73.396}, {"ticker": "TGSU2", "desc": "T. DE GAS DEL SUR ESC. \"B\" 1 V.", "tipo": "Acciones", "fecha_compra": "2024-03-01", "fecha_venta": "2025-02-07", "cantidad": 7.0, "pc": 2.7931, "pv": 5.5708, "gastos": 0.5281, "pnl": 18.9158, "dias": 343.0, "ret_pct": 99.4477}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "tipo": "Acciones", "fecha_compra": "2024-03-08", "fecha_venta": "2025-02-07", "cantidad": 10.0, "pc": 2.3443, "pv": 6.7742, "gastos": 0.6635, "pnl": 43.6358, "dias": 336.0, "ret_pct": 188.9678}, {"ticker": "EQUITYSA", "desc": "Equity Selection Clase A", "tipo": "Fondos", "fecha_compra": "2024-12-19", "fecha_venta": "2025-02-07", "cantidad": 54756.7991, "pc": 0.0114, "pv": 0.011, "gastos": 0.0, "pnl": -24.9093, "dias": 50.0, "ret_pct": -3.9841}, {"ticker": "EQUITYSA", "desc": "Equity Selection Clase A", "tipo": "Fondos", "fecha_compra": "2024-10-03", "fecha_venta": "2025-02-07", "cantidad": 39234.5741, "pc": 0.008, "pv": 0.011, "gastos": 0.0, "pnl": 116.4212, "dias": 127.0, "ret_pct": 37.1103}, {"ticker": "EQUITYSA", "desc": "Equity Selection Clase A", "tipo": "Fondos", "fecha_compra": "2024-09-02", "fecha_venta": "2025-02-07", "cantidad": 3372.9277, "pc": 0.0074, "pv": 0.011, "gastos": 0.0, "pnl": 12.1192, "dias": 158.0, "ret_pct": 48.7518}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "tipo": "Acciones", "fecha_compra": "2024-04-09", "fecha_venta": "2025-02-07", "cantidad": 38.0, "pc": 3.2594, "pv": 7.5467, "gastos": 3.8382, "pnl": 159.0779, "dias": 304.0, "ret_pct": 131.5354}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "tipo": "Acciones", "fecha_compra": "2024-03-11", "fecha_venta": "2025-02-07", "cantidad": 29.0, "pc": 2.2948, "pv": 6.7742, "gastos": 2.5084, "pnl": 127.3942, "dias": 333.0, "ret_pct": 195.1966}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "tipo": "Cedears", "fecha_compra": "2024-06-24", "fecha_venta": "2025-02-17", "cantidad": 28.0, "pc": 5.0897, "pv": 5.7351, "gastos": 2.4093, "pnl": 15.6618, "dias": 238.0, "ret_pct": 12.6804}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "tipo": "Bonos - Dólar", "fecha_compra": "2024-06-11", "fecha_venta": "2025-02-25", "cantidad": 3.0, "pc": 0.4353, "pv": 0.6509, "gastos": 0.0198, "pnl": 0.6271, "dias": 259.0, "ret_pct": 49.5428}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "tipo": "Bonos - Dólar", "fecha_compra": "2024-03-27", "fecha_venta": "2025-02-25", "cantidad": 1.0, "pc": 0.4638, "pv": 0.6509, "gastos": 0.0075, "pnl": 0.1796, "dias": 335.0, "ret_pct": 40.3404}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "tipo": "Bonos - Dólar", "fecha_compra": "2024-11-14", "fecha_venta": "2025-02-25", "cantidad": 155.0, "pc": 0.6607, "pv": 0.6509, "gastos": 1.1431, "pnl": -2.6644, "dias": 103.0, "ret_pct": -1.4856}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "tipo": "Bonos - Dólar", "fecha_compra": "2024-03-08", "fecha_venta": "2025-02-25", "cantidad": 1387.0, "pc": 0.4042, "pv": 0.6509, "gastos": 5.7861, "pnl": 336.3612, "dias": 354.0, "ret_pct": 61.0291}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "fecha_compra": "2024-11-01", "fecha_venta": "2025-03-05", "cantidad": 67.0, "pc": 1.0263, "pv": 1.015, "gastos": 1.0114, "pnl": -1.7665, "dias": 124.0, "ret_pct": -1.0982}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "fecha_compra": "2024-12-02", "fecha_venta": "2025-03-05", "cantidad": 71.0, "pc": 1.293, "pv": 1.015, "gastos": 1.2598, "pnl": -20.9991, "dias": 93.0, "ret_pct": -21.5015}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "fecha_compra": "2024-06-03", "fecha_venta": "2025-03-05", "cantidad": 99.0, "pc": 0.9308, "pv": 1.015, "gastos": 1.352, "pnl": 6.9847, "dias": 275.0, "ret_pct": 9.0471}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "fecha_compra": "2024-04-18", "fecha_venta": "2025-03-05", "cantidad": 1.0, "pc": 0.9212, "pv": 1.015, "gastos": 0.0151, "pnl": 0.0787, "dias": 321.0, "ret_pct": 10.1801}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "fecha_compra": "2024-03-08", "fecha_venta": "2025-03-05", "cantidad": 61.0, "pc": 0.8401, "pv": 1.015, "gastos": 0.4634, "pnl": 10.2048, "dias": 362.0, "ret_pct": 20.8173}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "fecha_compra": "2024-06-12", "fecha_venta": "2025-03-05", "cantidad": 1.0, "pc": 0.8523, "pv": 1.015, "gastos": 0.0129, "pnl": 0.1497, "dias": 266.0, "ret_pct": 19.0841}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "fecha_compra": "2024-05-15", "fecha_venta": "2025-03-05", "cantidad": 12.0, "pc": 1.0294, "pv": 1.015, "gastos": 0.1884, "pnl": -0.3606, "dias": 294.0, "ret_pct": -1.3946}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "fecha_compra": "2024-09-27", "fecha_venta": "2025-03-05", "cantidad": 87.0, "pc": 0.9324, "pv": 1.015, "gastos": 1.2142, "pnl": 5.9731, "dias": 159.0, "ret_pct": 8.8603}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "fecha_compra": "2024-11-08", "fecha_venta": "2025-03-05", "cantidad": 46.0, "pc": 1.0236, "pv": 1.015, "gastos": 0.6979, "pnl": -1.092, "dias": 117.0, "ret_pct": -0.8371}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "fecha_compra": "2024-10-01", "fecha_venta": "2025-03-05", "cantidad": 45.0, "pc": 0.8833, "pv": 1.015, "gastos": 0.6074, "pnl": 5.3212, "dias": 155.0, "ret_pct": 14.9159}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "fecha_compra": "2024-11-20", "fecha_venta": "2025-03-05", "cantidad": 78.0, "pc": 1.1778, "pv": 1.015, "gastos": 1.3079, "pnl": -14.0077, "dias": 105.0, "ret_pct": -13.8238}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "tipo": "Acciones", "fecha_compra": "2024-03-27", "fecha_venta": "2025-03-05", "cantidad": 106.0, "pc": 0.9425, "pv": 1.015, "gastos": 1.6332, "pnl": 6.0476, "dias": 343.0, "ret_pct": 7.6878}, {"ticker": "AL30", "desc": "BONO REP. ARGENTINA USD STEP UP 2030", "tipo": "Bonos - Dólar", "fecha_compra": "2025-03-05", "fecha_venta": "2025-03-06", "cantidad": 406.0, "pc": 0.6576, "pv": 0.654, "gastos": 2.5042, "pnl": -3.973, "dias": 1.0, "ret_pct": -0.5501}, {"ticker": "GD30", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/30", "tipo": "Bonos - Dólar", "fecha_compra": "2024-09-10", "fecha_venta": "2025-03-06", "cantidad": 119.0, "pc": 0.5709, "pv": 0.6609, "gastos": 0.6527, "pnl": 10.0573, "dias": 177.0, "ret_pct": 15.7646}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "tipo": "Cedears", "fecha_compra": "2025-01-02", "fecha_venta": "2025-03-12", "cantidad": 24.0, "pc": 5.8, "pv": 4.81, "gastos": 1.7628, "pnl": -25.5228, "dias": 69.0, "ret_pct": -17.069}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "tipo": "Cedears", "fecha_compra": "2024-08-01", "fecha_venta": "2025-03-12", "cantidad": 16.0, "pc": 4.6458, "pv": 4.81, "gastos": 1.0523, "pnl": 1.5753, "dias": 223.0, "ret_pct": 3.5349}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "tipo": "Cedears", "fecha_compra": "2024-06-24", "fecha_venta": "2025-03-12", "cantidad": 29.0, "pc": 5.0897, "pv": 4.81, "gastos": 2.0215, "pnl": -10.134, "dias": 261.0, "ret_pct": -5.4962}, {"ticker": "MELI", "desc": "CEDEAR MERCADOLIBRE INC.", "tipo": "Cedears", "fecha_compra": "2024-07-01", "fecha_venta": "2025-03-12", "cantidad": 6.0, "pc": 13.1824, "pv": 16.6, "gastos": 1.1816, "pnl": 19.3241, "dias": 254.0, "ret_pct": 25.9256}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "tipo": "Cedears", "fecha_compra": "2024-08-28", "fecha_venta": "2025-03-12", "cantidad": 22.0, "pc": 5.2914, "pv": 4.81, "gastos": 1.5746, "pnl": -12.1658, "dias": 196.0, "ret_pct": -9.0981}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "tipo": "Cedears", "fecha_compra": "2024-07-15", "fecha_venta": "2025-03-12", "cantidad": 4.0, "pc": 5.5, "pv": 4.81, "gastos": 0.2371, "pnl": -2.9971, "dias": 240.0, "ret_pct": -12.5455}, {"ticker": "AL30", "desc": "BONO REP. ARGENTINA USD STEP UP 2030", "tipo": "Bonos - Dólar", "fecha_compra": "2025-04-03", "fecha_venta": "2025-04-04", "cantidad": 522.0, "pc": 0.6297, "pv": 0.6161, "gastos": 2.9755, "pnl": -10.0577, "dias": 1.0, "ret_pct": -2.1547}, {"ticker": "BCMMUSDA", "desc": "Balanz Money Market USD Clase A", "tipo": "Fondos", "fecha_compra": "2025-04-07", "fecha_venta": "2025-04-22", "cantidad": 325.745, "pc": 1.0052, "pv": 1.0064, "gastos": 0.0, "pnl": 0.3788, "dias": 15.0, "ret_pct": 0.1157}, {"ticker": "YM35O", "desc": "ON YPF CLASE 35  VTO 27/02/27 U$S C.G", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-02-25", "fecha_venta": "2025-05-05", "cantidad": 632.0, "pc": 1.0, "pv": 0.9851, "gastos": 6.3639, "pnl": -15.7807, "dias": 69.0, "ret_pct": -1.49}, {"ticker": "AL30", "desc": "BONO REP. ARGENTINA USD STEP UP 2030", "tipo": "Bonos - Dólar", "fecha_compra": "2025-05-06", "fecha_venta": "2025-05-06", "cantidad": 679.0, "pc": 0.6723, "pv": 0.6722, "gastos": 4.5828, "pnl": -4.6614, "dias": 0.0, "ret_pct": -0.0172}, {"ticker": "GNCXO", "desc": "ON GENNEIA SA REGS 8,75% V.02/09/2027", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-10-03", "fecha_venta": "2025-06-27", "cantidad": 1000.0, "pc": 0.6361, "pv": 0.519, "gastos": 6.4407, "pnl": -123.5148, "dias": 267.0, "ret_pct": -18.4057}, {"ticker": "GNCXO", "desc": "ON GENNEIA SA REGS 8,75% V.02/09/2027", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-06-11", "fecha_venta": "2025-06-27", "cantidad": 1000.0, "pc": 0.722, "pv": 0.519, "gastos": 5.4865, "pnl": -208.4865, "dias": 381.0, "ret_pct": -28.1163}, {"ticker": "AL30", "desc": "BONO REP. ARGENTINA USD STEP UP 2030", "tipo": "Bonos - Dólar", "fecha_compra": "2025-07-03", "fecha_venta": "2025-07-03", "cantidad": 1470.0, "pc": 0.6864, "pv": 0.6903, "gastos": 10.143, "pnl": -4.4168, "dias": 0.0, "ret_pct": 0.5675}, {"ticker": "YM35O", "desc": "ON YPF CLASE 35  VTO 27/02/27 U$S C.G", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-06-03", "fecha_venta": "2025-07-16", "cantidad": 213.0, "pc": 0.9948, "pv": 1.0015, "gastos": 2.198, "pnl": -0.7661, "dias": 43.0, "ret_pct": 0.6758}, {"ticker": "YM35O", "desc": "ON YPF CLASE 35  VTO 27/02/27 U$S C.G", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-05-22", "fecha_venta": "2025-07-16", "cantidad": 68.0, "pc": 1.0075, "pv": 1.0015, "gastos": 0.7174, "pnl": -1.1254, "dias": 55.0, "ret_pct": -0.5955}, {"ticker": "YM35O", "desc": "ON YPF CLASE 35  VTO 27/02/27 U$S C.G", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-03-10", "fecha_venta": "2025-07-16", "cantidad": 265.0, "pc": 1.0025, "pv": 1.0015, "gastos": 2.5358, "pnl": -2.8008, "dias": 128.0, "ret_pct": -0.0998}, {"ticker": "YM35O", "desc": "ON YPF CLASE 35  VTO 27/02/27 U$S C.G", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-02-25", "fecha_venta": "2025-07-16", "cantidad": 368.0, "pc": 1.0, "pv": 1.0015, "gastos": 3.8658, "pnl": -3.3138, "dias": 141.0, "ret_pct": 0.15}, {"ticker": "YM35O", "desc": "ON YPF CLASE 35  VTO 27/02/27 U$S C.G", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-05-29", "fecha_venta": "2025-07-16", "cantidad": 52.0, "pc": 1.0, "pv": 1.0015, "gastos": 0.5345, "pnl": -0.4565, "dias": 48.0, "ret_pct": 0.15}, {"ticker": "YM35O", "desc": "ON YPF CLASE 35  VTO 27/02/27 U$S C.G", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-05-27", "fecha_venta": "2025-07-16", "cantidad": 11.0, "pc": 0.998, "pv": 1.0015, "gastos": 0.1113, "pnl": -0.0728, "dias": 50.0, "ret_pct": 0.3507}, {"ticker": "AL30", "desc": "BONO REP. ARGENTINA USD STEP UP 2030", "tipo": "Bonos - Dólar", "fecha_compra": "2025-07-17", "fecha_venta": "2025-07-17", "cantidad": 3130.0, "pc": 0.5947, "pv": 0.5933, "gastos": 18.4202, "pnl": -22.8336, "dias": 0.0, "ret_pct": -0.2371}, {"ticker": "IRCOO", "desc": "ON IRSA INVER Y REP C23 V23/10/29 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-10-21", "fecha_venta": "2025-07-17", "cantidad": 543.0, "pc": 1.0, "pv": 1.06, "gastos": 5.8966, "pnl": 26.6834, "dias": 269.0, "ret_pct": 6.0}, {"ticker": "BPOD7", "desc": "BOPREAL S. 1 D VTO31/10/27 U$S CG", "tipo": "Bonos - Dólar", "fecha_compra": "2024-09-27", "fecha_venta": "2025-07-29", "cantidad": 300.0, "pc": 0.8171, "pv": 0.9632, "gastos": 3.0349, "pnl": 40.7942, "dias": 305.0, "ret_pct": 17.8799}, {"ticker": "BPOD7", "desc": "BOPREAL S. 1 D VTO31/10/27 U$S CG", "tipo": "Bonos - Dólar", "fecha_compra": "2024-11-22", "fecha_venta": "2025-07-29", "cantidad": 3.0, "pc": 0.0, "pv": 0.9632, "gastos": -0.8675, "pnl": 3.7571, "dias": 249.0, "ret_pct": 0}, {"ticker": "BPOD7", "desc": "BOPREAL S. 1 D VTO31/10/27 U$S CG", "tipo": "Bonos - Dólar", "fecha_compra": "2024-11-01", "fecha_venta": "2025-07-29", "cantidad": 81.0, "pc": 0.8501, "pv": 0.9632, "gastos": 0.8036, "pnl": 8.3575, "dias": 270.0, "ret_pct": 13.3043}, {"ticker": "BPOD7", "desc": "BOPREAL S. 1 D VTO31/10/27 U$S CG", "tipo": "Bonos - Dólar", "fecha_compra": "2025-01-14", "fecha_venta": "2025-07-29", "cantidad": 386.0, "pc": 0.9309, "pv": 0.9632, "gastos": 4.0019, "pnl": 8.4659, "dias": 196.0, "ret_pct": 3.4698}, {"ticker": "BPOD7", "desc": "BOPREAL S. 1 D VTO31/10/27 U$S CG", "tipo": "Bonos - Dólar", "fecha_compra": "2024-06-19", "fecha_venta": "2025-07-29", "cantidad": 532.0, "pc": 0.7286, "pv": 0.9632, "gastos": 4.9542, "pnl": 119.8575, "dias": 405.0, "ret_pct": 32.2003}, {"ticker": "BPOD7", "desc": "BOPREAL S. 1 D VTO31/10/27 U$S CG", "tipo": "Bonos - Dólar", "fecha_compra": "2024-07-01", "fecha_venta": "2025-07-29", "cantidad": 261.0, "pc": 0.7106, "pv": 0.9632, "gastos": 2.2803, "pnl": 63.6393, "dias": 393.0, "ret_pct": 35.5409}, {"ticker": "BPOD7", "desc": "BOPREAL S. 1 D VTO31/10/27 U$S CG", "tipo": "Bonos - Dólar", "fecha_compra": "2024-10-03", "fecha_venta": "2025-07-29", "cantidad": 591.0, "pc": 0.8421, "pv": 0.9632, "gastos": 6.1098, "pnl": 65.4725, "dias": 299.0, "ret_pct": 14.3835}, {"ticker": "AL30", "desc": "BONO REP. ARGENTINA USD STEP UP 2030", "tipo": "Bonos - Dólar", "fecha_compra": "2025-07-30", "fecha_venta": "2025-07-30", "cantidad": 14.0, "pc": 0.6035, "pv": 0.6024, "gastos": 0.0827, "pnl": -0.0981, "dias": 0.0, "ret_pct": -0.1823}, {"ticker": "AL30", "desc": "BONO REP. ARGENTINA USD STEP UP 2030", "tipo": "Bonos - Dólar", "fecha_compra": "2025-07-30", "fecha_venta": "2025-07-30", "cantidad": 1665.0, "pc": 0.6031, "pv": 0.6021, "gastos": 9.8598, "pnl": -11.4488, "dias": 0.0, "ret_pct": -0.1582}, {"ticker": "GLD", "desc": "CEDEAR ETF SPDR GOLD TRUST", "tipo": "Cedears", "fecha_compra": "2025-04-22", "fecha_venta": "2025-08-01", "cantidad": 50.0, "pc": 6.42, "pv": 6.0556, "gastos": 4.6898, "pnl": -22.9102, "dias": 101.0, "ret_pct": -5.6761}, {"ticker": "S29G5", "desc": "LT REP ARGENTINA CAP V29/08/25 $ CG", "tipo": "Letras - ARS", "fecha_compra": "2025-08-22", "fecha_venta": "2025-08-29", "cantidad": 320591.0, "pc": 0.0012, "pv": 0.0012, "gastos": 0.3807, "pnl": -2.7015, "dias": 7.0, "ret_pct": -0.6157}, {"ticker": "TGSU2", "desc": "T. DE GAS DEL SUR ESC. \"B\" 1 V.", "tipo": "Acciones", "fecha_compra": "2024-09-27", "fecha_venta": "2025-09-01", "cantidad": 10.0, "pc": 3.8539, "pv": 5.1308, "gastos": 0.7218, "pnl": 12.0476, "dias": 339.0, "ret_pct": 33.1339}, {"ticker": "TGSU2", "desc": "T. DE GAS DEL SUR ESC. \"B\" 1 V.", "tipo": "Acciones", "fecha_compra": "2024-05-28", "fecha_venta": "2025-09-01", "cantidad": 1.0, "pc": 3.8567, "pv": 5.1308, "gastos": 0.0725, "pnl": 1.2016, "dias": 461.0, "ret_pct": 33.0365}, {"ticker": "TGSU2", "desc": "T. DE GAS DEL SUR ESC. \"B\" 1 V.", "tipo": "Acciones", "fecha_compra": "2024-10-01", "fecha_venta": "2025-09-01", "cantidad": 10.0, "pc": 3.8206, "pv": 5.1308, "gastos": 0.7156, "pnl": 12.3866, "dias": 335.0, "ret_pct": 34.2936}, {"ticker": "TGSU2", "desc": "T. DE GAS DEL SUR ESC. \"B\" 1 V.", "tipo": "Acciones", "fecha_compra": "2024-06-03", "fecha_venta": "2025-09-01", "cantidad": 19.0, "pc": 3.923, "pv": 5.1308, "gastos": 1.3472, "pnl": 21.601, "dias": 455.0, "ret_pct": 30.7875}, {"ticker": "TGSU2", "desc": "T. DE GAS DEL SUR ESC. \"B\" 1 V.", "tipo": "Acciones", "fecha_compra": "2024-11-01", "fecha_venta": "2025-09-01", "cantidad": 14.0, "pc": 4.7366, "pv": 5.1308, "gastos": 1.1453, "pnl": 4.3731, "dias": 304.0, "ret_pct": 8.3218}, {"ticker": "TGSU2", "desc": "T. DE GAS DEL SUR ESC. \"B\" 1 V.", "tipo": "Acciones", "fecha_compra": "2024-11-20", "fecha_venta": "2025-09-01", "cantidad": 15.0, "pc": 5.9166, "pv": 5.1308, "gastos": 1.4138, "pnl": -13.2, "dias": 285.0, "ret_pct": -13.2805}, {"ticker": "TGSU2", "desc": "T. DE GAS DEL SUR ESC. \"B\" 1 V.", "tipo": "Acciones", "fecha_compra": "2024-12-02", "fecha_venta": "2025-09-01", "cantidad": 14.0, "pc": 6.1653, "pv": 5.1308, "gastos": 1.3507, "pnl": -15.8331, "dias": 273.0, "ret_pct": -16.7788}, {"ticker": "TGSU2", "desc": "T. DE GAS DEL SUR ESC. \"B\" 1 V.", "tipo": "Acciones", "fecha_compra": "2024-03-27", "fecha_venta": "2025-09-01", "cantidad": 30.0, "pc": 3.2966, "pv": 5.1308, "gastos": 2.292, "pnl": 52.7352, "dias": 523.0, "ret_pct": 55.6409}, {"ticker": "TGSU2", "desc": "T. DE GAS DEL SUR ESC. \"B\" 1 V.", "tipo": "Acciones", "fecha_compra": "2024-03-01", "fecha_venta": "2025-09-01", "cantidad": 39.0, "pc": 2.7931, "pv": 5.1308, "gastos": 2.7305, "pnl": 88.4387, "dias": 549.0, "ret_pct": 83.6935}, {"ticker": "S12S5", "desc": "LETRAS DEL TESORO CAP $ V 12/09/25", "tipo": "Letras - ARS", "fecha_compra": "2025-09-01", "fecha_venta": "2025-09-12", "cantidad": 636577.0, "pc": 0.0011, "pv": 0.0011, "gastos": 0.7319, "pnl": -38.5298, "dias": 11.0, "ret_pct": -5.2157}, {"ticker": "BPO28", "desc": "BOPREAL S.4 VTO31/10/28 U$S CG", "tipo": "Bonos - Dólar Link", "fecha_compra": "2025-07-30", "fecha_venta": "2025-09-30", "cantidad": 300.0, "pc": 0.8053, "pv": 0.0, "gastos": 1.1921, "pnl": -242.7821, "dias": 62.0, "ret_pct": -100.0}, {"ticker": "BPO28", "desc": "BOPREAL S.4 VTO31/10/28 U$S CG", "tipo": "Bonos - Dólar Link", "fecha_compra": "2025-07-29", "fecha_venta": "2025-09-30", "cantidad": 1000.0, "pc": 0.809, "pv": 0.0, "gastos": 4.0952, "pnl": -813.0952, "dias": 63.0, "ret_pct": -100.0}, {"ticker": "YM37O", "desc": "ON YPF CLASE 37 VTO 07/05/27 U$S C.G", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-08-07", "fecha_venta": "2025-10-07", "cantidad": 24.0, "pc": 1.0105, "pv": 1.02, "gastos": 0.251, "pnl": -0.023, "dias": 61.0, "ret_pct": 0.9401}, {"ticker": "YM37O", "desc": "ON YPF CLASE 37 VTO 07/05/27 U$S C.G", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-05-06", "fecha_venta": "2025-10-07", "cantidad": 1125.0, "pc": 1.0, "pv": 1.02, "gastos": 12.4757, "pnl": 10.0243, "dias": 154.0, "ret_pct": 2.0}, {"ticker": "ECOG", "desc": "ECOGAS INV.  CL.D  1 V. ESCRIT", "tipo": "Acciones", "fecha_compra": "2025-10-01", "fecha_venta": "2025-10-22", "cantidad": 31.0, "pc": 0.0, "pv": 1.2103, "gastos": -0.1252, "pnl": 37.6448, "dias": 21.0, "ret_pct": 0}, {"ticker": "BCMMA", "desc": "Money Market Clase A", "tipo": "Fondos", "fecha_compra": "2025-11-03", "fecha_venta": "2025-11-04", "cantidad": 85886.7217, "pc": 0.007, "pv": 0.007, "gastos": 0.0, "pnl": -0.5575, "dias": 1.0, "ret_pct": -0.0926}, {"ticker": "CS48O", "desc": "ON CRESUD S32 CL48 V11/07/28 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-07-03", "fecha_venta": "2025-12-03", "cantidad": 1000.0, "pc": 1.0, "pv": 1.0555, "gastos": 11.2238, "pnl": 44.2762, "dias": 153.0, "ret_pct": 5.55}, {"ticker": "YM39O", "desc": "ON YPF CLASE 39 VTO 22/07/30 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-07-17", "fecha_venta": "2026-01-13", "cantidad": 1838.0, "pc": 1.0, "pv": 1.1074, "gastos": 20.78, "pnl": 176.637, "dias": 180.0, "ret_pct": 10.7409}, {"ticker": "YM41O", "desc": "ON YPF CL.41 08/01/27 USD", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-10-07", "fecha_venta": "2026-01-27", "cantidad": 1160.0, "pc": 1.0, "pv": 1.012, "gastos": 10.984, "pnl": 2.936, "dias": 112.0, "ret_pct": 1.2}, {"ticker": "GD30", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/30", "tipo": "Bonos - Dólar", "fecha_compra": "2024-09-10", "fecha_venta": "2026-01-29", "cantidad": 3384.0, "pc": 0.5709, "pv": 0.6314, "gastos": 21.6281, "pnl": 183.1039, "dias": 506.0, "ret_pct": 10.5973}, {"ticker": "GD30", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/30", "tipo": "Bonos - Dólar", "fecha_compra": "2024-11-22", "fecha_venta": "2026-01-29", "cantidad": 6.0, "pc": 0.0, "pv": 0.6314, "gastos": -0.6482, "pnl": 4.4366, "dias": 433.0, "ret_pct": 0}, {"ticker": "VIST", "desc": "CEDEAR Vista Energy S.A.B. de C.V (ADS)", "tipo": "Cedears", "fecha_compra": "2024-12-13", "fecha_venta": "2026-02-02", "cantidad": 14.0, "pc": 20.2, "pv": 20.85, "gastos": 4.843, "pnl": 4.257, "dias": 416.0, "ret_pct": 3.2178}, {"ticker": "DNC5O", "desc": "ON EDENOR CL.5 V.05/08/28 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-10-03", "fecha_venta": "2026-02-24", "cantidad": 465.0, "pc": 1.0753, "pv": 1.0485, "gastos": 5.8308, "pnl": -18.2939, "dias": 509.0, "ret_pct": -2.4925}, {"ticker": "DNC5O", "desc": "ON EDENOR CL.5 V.05/08/28 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-10-01", "fecha_venta": "2026-02-24", "cantidad": 20.0, "pc": 1.0558, "pv": 1.0485, "gastos": 0.2458, "pnl": -0.3917, "dias": 511.0, "ret_pct": -0.6911}, {"ticker": "DNC5O", "desc": "ON EDENOR CL.5 V.05/08/28 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-06-27", "fecha_venta": "2026-02-24", "cantidad": 488.0, "pc": 1.013, "pv": 1.0485, "gastos": 5.4098, "pnl": 11.9142, "dias": 242.0, "ret_pct": 3.5044}, {"ticker": "DNC5O", "desc": "ON EDENOR CL.5 V.05/08/28 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-08-05", "fecha_venta": "2026-02-24", "cantidad": 72.0, "pc": 1.003, "pv": 1.0485, "gastos": 0.755, "pnl": 2.521, "dias": 203.0, "ret_pct": 4.5364}, {"ticker": "DNC3O", "desc": "ON EDENOR CL.3 V.22/11/26 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-09-27", "fecha_venta": "2026-02-24", "cantidad": 381.0, "pc": 1.0656, "pv": 1.0415, "gastos": 4.7115, "pnl": -13.8913, "dias": 515.0, "ret_pct": -2.2611}, {"ticker": "DNC3O", "desc": "ON EDENOR CL.3 V.22/11/26 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-10-03", "fecha_venta": "2026-02-24", "cantidad": 455.0, "pc": 1.0921, "pv": 1.0415, "gastos": 5.7363, "pnl": -28.7663, "dias": 509.0, "ret_pct": -4.6346}, {"ticker": "DNC3O", "desc": "ON EDENOR CL.3 V.22/11/26 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-07-01", "fecha_venta": "2026-02-24", "cantidad": 182.0, "pc": 1.0223, "pv": 1.0415, "gastos": 2.0494, "pnl": 1.4392, "dias": 603.0, "ret_pct": 1.8749}, {"ticker": "DNC3O", "desc": "ON EDENOR CL.3 V.22/11/26 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-11-25", "fecha_venta": "2026-02-24", "cantidad": 105.0, "pc": 1.0095, "pv": 1.0415, "gastos": 1.021, "pnl": 2.339, "dias": 91.0, "ret_pct": 3.1699}, {"ticker": "DNC3O", "desc": "ON EDENOR CL.3 V.22/11/26 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-06-19", "fecha_venta": "2026-02-24", "cantidad": 392.0, "pc": 1.066, "pv": 1.0415, "gastos": 4.727, "pnl": -14.3434, "dias": 615.0, "ret_pct": -2.3012}, {"ticker": "DNC3O", "desc": "ON EDENOR CL.3 V.22/11/26 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-06-27", "fecha_venta": "2026-02-24", "cantidad": 564.0, "pc": 1.0095, "pv": 1.0415, "gastos": 6.2339, "pnl": 11.8141, "dias": 242.0, "ret_pct": 3.1699}, {"ticker": "DNC3O", "desc": "ON EDENOR CL.3 V.22/11/26 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-07-10", "fecha_venta": "2026-02-24", "cantidad": 2.0, "pc": 1.034, "pv": 1.0415, "gastos": 0.0184, "pnl": -0.0034, "dias": 594.0, "ret_pct": 0.7253}, {"ticker": "DNC5O", "desc": "ON EDENOR CL.5 V.05/08/28 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-09-09", "fecha_venta": "2026-02-24", "cantidad": 125.0, "pc": 1.038, "pv": 1.0485, "gastos": 1.3526, "pnl": -0.0401, "dias": 533.0, "ret_pct": 1.0116}, {"ticker": "DNC3O", "desc": "ON EDENOR CL.3 V.22/11/26 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-09-03", "fecha_venta": "2026-02-24", "cantidad": 14.0, "pc": 1.059, "pv": 1.0415, "gastos": 0.1475, "pnl": -0.3925, "dias": 539.0, "ret_pct": -1.6525}, {"ticker": "DNC3O", "desc": "ON EDENOR CL.3 V.22/11/26 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-10-04", "fecha_venta": "2026-02-24", "cantidad": 23.0, "pc": 1.0888, "pv": 1.0415, "gastos": 0.2599, "pnl": -1.3479, "dias": 508.0, "ret_pct": -4.3446}, {"ticker": "DNC5O", "desc": "ON EDENOR CL.5 V.05/08/28 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2025-09-11", "fecha_venta": "2026-02-24", "cantidad": 40.0, "pc": 0.9699, "pv": 1.0485, "gastos": 0.391, "pnl": 2.753, "dias": 166.0, "ret_pct": 8.1039}, {"ticker": "DNC5O", "desc": "ON EDENOR CL.5 V.05/08/28 U$S CG", "tipo": "Corporativos - Dólar", "fecha_compra": "2024-09-27", "fecha_venta": "2026-02-24", "cantidad": 233.0, "pc": 1.0526, "pv": 1.0485, "gastos": 2.8707, "pnl": -3.8171, "dias": 515.0, "ret_pct": -0.3859}];
+var CUPONES=[{"ticker": "AL30", "desc": "BONO REP. ARGENTINA USD STEP UP 2030", "fecha": "2024-07-10", "monto_usd": 9.1539}, {"ticker": "BPOA8", "desc": "BOPREAL 4A VTO31/10/28 U$S CG", "fecha": "2025-10-31", "monto_usd": 4.4654}, {"ticker": "BPOB8", "desc": "BOPREAL 4B VTO31/10/28 U$S CG", "fecha": "2025-10-31", "monto_usd": 8.9307}, {"ticker": "BPOD7", "desc": "BOPREAL S. 1 D VTO31/10/27 U$S CG", "fecha": "2024-10-31", "monto_usd": 60.7076}, {"ticker": "BPOD7", "desc": "BOPREAL S. 1 D VTO31/10/27 U$S CG", "fecha": "2025-04-30", "monto_usd": 53.4044}, {"ticker": "BPY26", "desc": "BOPREAL S.3 VTO31/05/26 U$S CG", "fecha": "2024-09-02", "monto_usd": 8.5902}, {"ticker": "DNC3O", "desc": "ON EDENOR CL.3 V.22/11/26 U$S CG", "fecha": "2024-11-22", "monto_usd": 66.5205}, {"ticker": "DNC3O", "desc": "ON EDENOR CL.3 V.22/11/26 U$S CG", "fecha": "2025-05-22", "monto_usd": 70.2449}, {"ticker": "DNC3O", "desc": "ON EDENOR CL.3 V.22/11/26 U$S CG", "fecha": "2025-11-25", "monto_usd": 95.2027}, {"ticker": "DNC5O", "desc": "ON EDENOR CL.5 V.05/08/28 U$S CG", "fecha": "2025-02-05", "monto_usd": 35.5307}, {"ticker": "DNC5O", "desc": "ON EDENOR CL.5 V.05/08/28 U$S CG", "fecha": "2025-08-05", "monto_usd": 63.4601}, {"ticker": "DNC5O", "desc": "ON EDENOR CL.5 V.05/08/28 U$S CG", "fecha": "2026-02-05", "monto_usd": 68.3586}, {"ticker": "GD30", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/30", "fecha": "2025-01-10", "monto_usd": 11.2558}, {"ticker": "GD30", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/30", "fecha": "2025-07-10", "monto_usd": 11.0562}, {"ticker": "GD30", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/30", "fecha": "2026-01-12", "monto_usd": 10.076}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "fecha": "2024-07-10", "monto_usd": 33.2396}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "fecha": "2025-01-10", "monto_usd": 62.5439}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "fecha": "2025-07-10", "monto_usd": 37.876}, {"ticker": "GD35", "desc": "BONOS REP. ARG. U$S STEP UP V.09/07/35", "fecha": "2026-01-12", "monto_usd": 37.9462}, {"ticker": "GNCXO", "desc": "ON GENNEIA SA REGS 8,75% V.02/09/2027", "fecha": "2024-09-04", "monto_usd": 22.8683}, {"ticker": "GNCXO", "desc": "ON GENNEIA SA REGS 8,75% V.02/09/2027", "fecha": "2025-03-05", "monto_usd": 45.4337}, {"ticker": "MCC1O", "desc": "ON PECOM S.1 V.10/03/29 U$S CG", "fecha": "2025-09-10", "monto_usd": 39.5764}, {"ticker": "MGCHO", "desc": "ON PAMPA E CL. 16 V04/11/25 U$S  CG", "fecha": "2024-05-06", "monto_usd": 12.9731}, {"ticker": "MGCQO", "desc": "ON PAMPA ENERGIA CL.25 V06/08/28 U$S CG", "fecha": "2026-02-06", "monto_usd": 36.3261}, {"ticker": "MRCAO", "desc": "ON GM/CTR REGS 9,625% V.01/12/2027", "fecha": "2024-06-05", "monto_usd": 23.6419}, {"ticker": "OZC3O", "desc": "ON EDEMSA CL.3 V29/11/27 U$S CG", "fecha": "2025-05-29", "monto_usd": 51.9187}, {"ticker": "OZC3O", "desc": "ON EDEMSA CL.3 V29/11/27 U$S CG", "fecha": "2025-12-01", "monto_usd": 53.8663}, {"ticker": "YM35O", "desc": "ON YPF CLASE 35  VTO 27/02/27 U$S C.G", "fecha": "2025-05-27", "monto_usd": 10.5313}, {"ticker": "YM37O", "desc": "ON YPF CLASE 37 VTO 07/05/27 U$S C.G", "fecha": "2025-08-07", "monto_usd": 19.9094}, {"ticker": "YM41O", "desc": "ON YPF CL.41 08/01/27 USD", "fecha": "2026-01-08", "monto_usd": 17.1629}, {"ticker": "YMCJO", "desc": "ON YPF S.A. REGS 1,5% V.30/09/2033 (DTC)", "fecha": "2024-04-03", "monto_usd": 32.8883}, {"ticker": "YMCJO", "desc": "ON YPF S.A. REGS 1,5% V.30/09/2033 (DTC)", "fecha": "2024-09-30", "monto_usd": 16.2829}];
+var DIVS=[{"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "fecha": "2024-05-14", "monto_usd": 22.5057}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "fecha": "2024-06-12", "monto_usd": 25.4078}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "fecha": "2024-07-11", "monto_usd": 20.4972}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "fecha": "2025-06-30", "monto_usd": 1.5321}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "fecha": "2025-07-31", "monto_usd": 1.3853}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "fecha": "2025-08-29", "monto_usd": 1.4205}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "fecha": "2025-09-30", "monto_usd": 1.3114}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "fecha": "2025-10-31", "monto_usd": 1.3516}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "fecha": "2025-11-28", "monto_usd": 1.4435}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "fecha": "2025-12-30", "monto_usd": 1.4751}, {"ticker": "BBAR", "desc": "BCO. FRANCES ESCRITURALES 1 V.", "fecha": "2026-01-30", "monto_usd": 1.5334}, {"ticker": "CAT", "desc": "CEDEAR CATERPILLAR INC. ESCRIT.", "fecha": "2024-11-21", "monto_usd": 0.0009}, {"ticker": "CEPU", "desc": "CENTRAL PUERTO S.A. ESCRIT. \"B\" 1 V.", "fecha": "2024-11-22", "monto_usd": 1.9184}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "fecha": "2024-05-15", "monto_usd": 13.2007}, {"ticker": "CRES", "desc": "CRESUD S.A. ORDS. 1 VOTO ESCRITURALES", "fecha": "2024-11-08", "monto_usd": 39.1933}, {"ticker": "EWZ", "desc": "CEDEAR ISHARES MSCI BRAZIL CAP", "fecha": "2025-06-24", "monto_usd": 0.025}, {"ticker": "EWZ", "desc": "CEDEAR ISHARES MSCI BRAZIL CAP", "fecha": "2025-12-22", "monto_usd": 0.0395}, {"ticker": "EWZ", "desc": "CEDEAR ISHARES MSCI BRAZIL CAP", "fecha": "2026-01-07", "monto_usd": 0.0041}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "fecha": "2024-05-15", "monto_usd": 5.8394}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "fecha": "2024-05-24", "monto_usd": 11.0289}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "fecha": "2024-07-01", "monto_usd": 7.6788}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "fecha": "2024-07-24", "monto_usd": 8.4264}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "fecha": "2025-05-14", "monto_usd": 6.0052}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "fecha": "2025-07-11", "monto_usd": 2.0871}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "fecha": "2025-08-12", "monto_usd": 2.0319}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "fecha": "2025-09-10", "monto_usd": 1.9212}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "fecha": "2025-10-13", "monto_usd": 1.9819}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "fecha": "2025-11-12", "monto_usd": 1.9647}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "fecha": "2025-12-11", "monto_usd": 2.6437}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "fecha": "2026-01-14", "monto_usd": 3.2508}, {"ticker": "GGAL", "desc": "GRUPO FINANCIERO GALICIA \"B\"1V.ESC.", "fecha": "2026-02-11", "monto_usd": 3.4621}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "fecha": "2024-06-19", "monto_usd": 0.0003}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "fecha": "2024-09-17", "monto_usd": 0.0002}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "fecha": "2025-09-16", "monto_usd": 0.0007}, {"ticker": "GOOGL", "desc": "CEDEAR GOOGLE INC.", "fecha": "2025-12-16", "monto_usd": 0.0006}, {"ticker": "IEUR", "desc": "CEDEAR ISHARES CORE MSCI EUROPE ETF", "fecha": "2025-06-23", "monto_usd": 0.0104}, {"ticker": "IEUR", "desc": "CEDEAR ISHARES CORE MSCI EUROPE ETF", "fecha": "2025-12-22", "monto_usd": 0.0057}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "fecha": "2024-10-04", "monto_usd": 0.0}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "fecha": "2024-12-30", "monto_usd": 0.0}, {"ticker": "NVDA", "desc": "CEDEAR NVIDIA CORPORATION", "fecha": "2025-04-04", "monto_usd": 0.0}, {"ticker": "QQQ", "desc": "CEDEAR INVESCO QQQ TRUST", "fecha": "2024-05-02", "monto_usd": 0.0001}, {"ticker": "QQQ", "desc": "CEDEAR INVESCO QQQ TRUST", "fecha": "2026-01-05", "monto_usd": 0.0014}, {"ticker": "SPY", "desc": "CEDEAR SPDR S&P 500", "fecha": "2024-05-02", "monto_usd": 0.0007}, {"ticker": "SPY", "desc": "CEDEAR SPDR S&P 500", "fecha": "2024-08-01", "monto_usd": 0.0009}, {"ticker": "SPY", "desc": "CEDEAR SPDR S&P 500", "fecha": "2024-11-01", "monto_usd": 0.0012}, {"ticker": "SPY", "desc": "CEDEAR SPDR S&P 500", "fecha": "2025-02-03", "monto_usd": 0.0026}, {"ticker": "SPY", "desc": "CEDEAR SPDR S&P 500", "fecha": "2025-05-05", "monto_usd": 0.003}, {"ticker": "SPY", "desc": "CEDEAR SPDR S&P 500", "fecha": "2025-08-01", "monto_usd": 0.0028}, {"ticker": "SPY", "desc": "CEDEAR SPDR S&P 500", "fecha": "2025-11-03", "monto_usd": 0.0026}, {"ticker": "SPY", "desc": "CEDEAR SPDR S&P 500", "fecha": "2026-02-03", "monto_usd": 0.003}, {"ticker": "TGSU2", "desc": "T. DE GAS DEL SUR ESC. \"B\" 1 V.", "fecha": "2025-06-11", "monto_usd": 33.9729}];
+var TMAP={"BBAR": {"yahoo": "BBAR.BA", "cat": "accion_arg"}, "CEPU": {"yahoo": "CEPU.BA", "cat": "accion_arg"}, "GGAL": {"yahoo": "GGAL.BA", "cat": "accion_arg"}, "LOMA": {"yahoo": "LOMA.BA", "cat": "accion_arg"}, "PAMP": {"yahoo": "PAMP.BA", "cat": "accion_arg"}, "TXAR": {"yahoo": "TXAR.BA", "cat": "accion_arg"}, "YPFD": {"yahoo": "YPFD.BA", "cat": "accion_arg"}, "AMZN": {"yahoo": "AMZN.BA", "cat": "cedear"}, "EWZ": {"yahoo": "EWZ.BA", "cat": "cedear"}, "GLOB": {"yahoo": "GLOB.BA", "cat": "cedear"}, "GOOGL": {"yahoo": "GOOGL.BA", "cat": "cedear"}, "IEUR": {"yahoo": "IEUR.BA", "cat": "cedear"}, "MELI": {"yahoo": "MELI.BA", "cat": "cedear"}, "QQQ": {"yahoo": "QQQ.BA", "cat": "cedear"}, "SPY": {"yahoo": "SPY.BA", "cat": "cedear"}, "VIST": {"yahoo": "VIST.BA", "cat": "cedear"}, "AL30": {"byma": "AL30D", "cat": "bono_usd"}, "GD35": {"byma": "GD35D", "cat": "bono_usd"}, "BPOA8": {"byma": "BPOA8D", "cat": "bono_usd"}, "BPOB8": {"byma": "BPOB8D", "cat": "bono_usd"}, "CS50O": {"cat": "on_usd"}, "LUC5O": {"cat": "on_usd"}, "MCC1O": {"cat": "on_usd"}, "MGCQO": {"cat": "on_usd"}, "OTS6O": {"cat": "on_usd"}, "OZC3O": {"cat": "on_usd"}, "SBC2O": {"cat": "on_usd"}, "BAHUSDA": {"cat": "fondo"}};
+
+function u2(v){ return '$ '+Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function usd(v){ var n=Number(v); return (n>=0?'+ ':'- ')+'$ '+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function pct(v){ return (Number(v)>=0?'+':'')+Number(v).toFixed(2)+'%'; }
+function cls(v){ return Number(v)>0?'pos':Number(v)<0?'neg':'neu'; }
+function dsp(iso){ if(!iso)return '—'; var p=iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+function badge(t){
+  var m={'Acciones':'acc','Cedears':'ced','Bonos - Dólar':'bon','Bonos - Dólar Link':'bon',
+    'Corporativos - Dólar':'cor','Fondos':'fon','Letras - ARS':'let'};
+  return '<span class="badge b-'+(m[t]||'let')+'">'+t+'</span>';
+}
+
+// KPIs
+(function(){
+  var s=STATS;
+  document.getElementById('k0').textContent=u2(s.pnl_total);
+  var e1=document.getElementById('k1'); e1.textContent=u2(s.pnl_trading); e1.className='kv '+cls(s.pnl_trading);
+  document.getElementById('k1s').textContent='Gastos: '+u2(s.gastos);
+  document.getElementById('k2').textContent=u2(s.pnl_cupones+s.pnl_dividendos);
+  document.getElementById('k2s').textContent='Cup: '+u2(s.pnl_cupones)+' | Div: '+u2(s.pnl_dividendos);
+  var e3=document.getElementById('k3'); e3.textContent=s.win_rate.toFixed(1)+'%'; e3.className='kv '+cls(s.win_rate-50);
+  document.getElementById('k3s').textContent=s.winners+' ganadoras / '+s.losers+' perdedoras de '+s.total_trades;
+  document.getElementById('k4').textContent=u2(s.best_trade_val); document.getElementById('k4s').textContent=s.best_trade_ticker;
+  document.getElementById('k5').textContent=u2(Math.abs(s.worst_trade_val)); document.getElementById('k5s').textContent=s.worst_trade_ticker;
+  document.getElementById('k6').textContent=u2(s.avg_gain);
+  document.getElementById('k7').textContent=u2(Math.abs(s.avg_loss));
+})();
+
+// CHARTS
+Chart.defaults.color='#6b7280';
+Chart.defaults.borderColor='rgba(255,255,255,.06)';
+Chart.defaults.font.family='"DM Mono",monospace';
+
+var TT = {backgroundColor:'#1a2035',borderColor:'#2e3547',borderWidth:1,titleColor:'#9ca3af',bodyColor:'#e8eaf0',padding:10};
+
+// Cumulative
+(function(){
+  var labels = CUMUL.map(function(r){ return dsp(r.fecha); });
+  var vals   = CUMUL.map(function(r){ return r.pnl; });
+  new Chart(document.getElementById('cCumul'),{
+    type:'line',
+    data:{labels:labels,datasets:[{label:'P&L Acum.',data:vals,fill:'origin',
+      backgroundColor:function(c){
+        var g=c.chart.ctx.createLinearGradient(0,0,0,260);
+        g.addColorStop(0,'rgba(74,222,128,.3)');g.addColorStop(1,'rgba(74,222,128,.02)');return g;
+      },
+      borderColor:'#4ade80',borderWidth:2,pointRadius:0,pointHoverRadius:5,tension:.4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{...TT,mode:'index',intersect:false,callbacks:{label:function(c){return ' P&L: '+u2(c.parsed.y);}}}},
+      scales:{x:{ticks:{maxTicksLimit:8,maxRotation:40,font:{size:10}}},y:{ticks:{callback:function(v){return '$'+v.toFixed(0);},font:{size:10}}}}}
+  });
+})();
+
+// Monthly
+(function(){
+  var labels = MONTHLY.map(function(r){ return r.mes.substring(0,7); });
+  var vals   = MONTHLY.map(function(r){ return r.pnl; });
+  var col    = vals.map(function(v){ return v>=0?'rgba(74,222,128,.75)':'rgba(248,113,113,.75)'; });
+  new Chart(document.getElementById('cMonth'),{
+    type:'bar',
+    data:{labels:labels,datasets:[{label:'P&L Mensual',data:vals,backgroundColor:col,borderWidth:0,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{...TT,mode:'index',intersect:false,callbacks:{label:function(c){return ' P&L: '+u2(c.parsed.y);}}}},
+      scales:{x:{ticks:{maxTicksLimit:12,maxRotation:40,font:{size:10}}},y:{ticks:{callback:function(v){return '$'+v.toFixed(0);},font:{size:10}}}}}
+  });
+})();
+
+// By tipo
+(function(){
+  var labels = TIPOS.map(function(r){ return r.tipo; });
+  var vals   = TIPOS.map(function(r){ return r.pnl; });
+  var pal    = ['rgba(96,165,250,.8)','rgba(201,168,76,.8)','rgba(167,139,250,.8)','rgba(251,146,60,.8)','rgba(74,222,128,.8)','rgba(248,113,113,.8)','rgba(107,114,128,.8)'];
+  new Chart(document.getElementById('cTipo'),{
+    type:'bar',
+    data:{labels:labels,datasets:[{label:'P&L',data:vals,backgroundColor:vals.map(function(v,i){ return v>=0?pal[i]:'rgba(248,113,113,.8)'; }),borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:function(c){ return ' '+u2(c.parsed.x); }}}},
+      scales:{x:{ticks:{callback:function(v){ return '$'+v.toFixed(0); },font:{size:10}}},y:{ticks:{font:{size:10}}}}}
+  });
+})();
+
+// Ticker ranking
+(function(){
+  var sorted  = TICKERS.slice().sort(function(a,b){ return b.pnl-a.pnl; });
+  var combined= sorted.slice(0,8).concat(sorted.slice(-7).reverse());
+  var labels  = combined.map(function(r){ return r.ticker; });
+  var vals    = combined.map(function(r){ return r.pnl; });
+  var col     = vals.map(function(v){ return v>=0?'rgba(74,222,128,.75)':'rgba(248,113,113,.75)'; });
+  new Chart(document.getElementById('cTick'),{
+    type:'bar',
+    data:{labels:labels,datasets:[{label:'P&L Trading',data:vals,backgroundColor:col,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{...TT,callbacks:{label:function(c){ return ' '+u2(c.parsed.x); }}}},
+      scales:{x:{ticks:{callback:function(v){ return '$'+v.toFixed(0); },font:{size:10}}},y:{ticks:{font:{size:10}}}}}
+  });
+})();
+
+// SORT & TABLES
+var SS = {};
+function srt(tblId, headId, colIdx, key){
+  var s = SS[tblId] || {col:-1, asc:true};
+  s.asc = (s.col===colIdx) ? !s.asc : true;
+  s.col = colIdx;
+  SS[tblId] = s;
+  var ths = document.getElementById(headId).querySelectorAll('thead th');
+  ths.forEach(function(th,i){ th.className=th.className.replace(/ (asc|desc)/g,'')+(i===colIdx?(s.asc?' asc':' desc'):''); });
+  if(tblId==='tick') rTick();
+  else rTrades();
+}
+function cmp(a,b,key,asc){
+  var av=a[key], bv=b[key];
+  if(typeof av==='string') return asc?av.localeCompare(bv):bv.localeCompare(av);
+  return asc?av-bv:bv-av;
+}
+
+function rTick(){
+  var q  = (document.getElementById('fq').value||'').toLowerCase();
+  var ti = document.getElementById('fti').value;
+  var s  = SS['tick']||{col:4,asc:false};
+  var keys = ['ticker','desc','tipo','ops','pnl','cupones','dividendos','total','retorno_pct','dias'];
+  var rows = TICKERS
+    .filter(function(r){ return (!q||r.ticker.toLowerCase().includes(q)||r.desc.toLowerCase().includes(q))&&(!ti||r.tipo===ti); })
+    .sort(function(a,b){ return cmp(a,b,keys[s.col],s.asc); });
+  document.getElementById('bTick').innerHTML = rows.map(function(r){
+    return '<tr>'+
+      '<td><b>'+r.ticker+'</b></td>'+
+      '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis">'+r.desc+'</td>'+
+      '<td>'+badge(r.tipo)+'</td>'+
+      '<td class="r">'+r.ops+'</td>'+
+      '<td class="r '+cls(r.pnl)+'">'+u2(r.pnl)+'</td>'+
+      '<td class="r '+(r.cupones>0?'pos':'')+'">'+u2(r.cupones)+'</td>'+
+      '<td class="r '+(r.dividendos>0?'pos':'')+'">'+u2(r.dividendos)+'</td>'+
+      '<td class="r '+cls(r.total)+'"><b>'+u2(r.total)+'</b></td>'+
+      '<td class="r '+cls(r.retorno_pct)+'">'+pct(r.retorno_pct)+'</td>'+
+      '<td class="r">'+Math.round(r.dias)+'d</td>'+
+    '</tr>';
+  }).join('');
+}
+
+function rTrades(){
+  var q   = (document.getElementById('ftq').value||'').toLowerCase();
+  var ti  = document.getElementById('ftt').value;
+  var res = document.getElementById('ftr').value;
+  var s   = SS['trade']||{col:3,asc:false};
+  var keys = ['ticker','tipo','fecha_compra','fecha_venta','dias','cantidad','pc','pv','gastos','pnl','ret_pct'];
+  var rows = TRADES
+    .filter(function(r){
+      return (!q||r.ticker.toLowerCase().includes(q)||r.desc.toLowerCase().includes(q))
+          && (!ti||r.tipo===ti)
+          && (!res||(res==='win'&&r.pnl>=0)||(res==='loss'&&r.pnl<0));
+    })
+    .sort(function(a,b){ return cmp(a,b,keys[s.col],s.asc); });
+  document.getElementById('bTrade').innerHTML = rows.map(function(r){
+    return '<tr>'+
+      '<td title="'+r.desc+'"><b>'+r.ticker+'</b></td>'+
+      '<td>'+badge(r.tipo)+'</td>'+
+      '<td>'+dsp(r.fecha_compra)+'</td>'+
+      '<td>'+dsp(r.fecha_venta)+'</td>'+
+      '<td class="r">'+Math.round(r.dias)+'d</td>'+
+      '<td class="r">'+r.cantidad.toFixed(0)+'</td>'+
+      '<td class="r">'+u2(r.pc)+'</td>'+
+      '<td class="r">'+u2(r.pv)+'</td>'+
+      '<td class="r" style="color:var(--muted)">'+u2(r.gastos)+'</td>'+
+      '<td class="r '+cls(r.pnl)+'"><b>'+u2(r.pnl)+'</b></td>'+
+      '<td class="r '+cls(r.ret_pct)+'">'+pct(r.ret_pct)+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+// Income tables
+(function(){
+  var tc=0, td=0;
+  document.getElementById('bCup').innerHTML = CUPONES.map(function(r){
+    tc+=r.monto_usd;
+    return '<tr><td><b>'+r.ticker+'</b></td><td>'+dsp(r.fecha)+'</td><td class="r pos">'+u2(r.monto_usd)+'</td></tr>';
+  }).join('');
+  document.getElementById('bDiv').innerHTML = DIVS.map(function(r){
+    td+=r.monto_usd;
+    return '<tr><td><b>'+r.ticker+'</b></td><td>'+dsp(r.fecha)+'</td><td class="r pos">'+u2(r.monto_usd)+'</td></tr>';
+  }).join('');
+  document.getElementById('fCup').textContent = u2(tc);
+  document.getElementById('fDiv').textContent = u2(td);
+})();
+
+// TABS
+var carteraLoaded = false;
+function showTab(btn, id){
+  document.querySelectorAll('.tc').forEach(function(e){ e.classList.remove('active'); });
+  document.querySelectorAll('.tab').forEach(function(e){ e.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='t-cartera' && !carteraLoaded){ carteraLoaded=true; loadPrices(); }
+}
+
+// LIVE PRICES
+var liveP = {};
+var mepVal = null;
+
+function setStatus(state, txt){
+  var dot = document.getElementById('cdot');
+  var lbl = document.getElementById('ctxt');
+  if(dot) dot.className = 'dot' + (state ? ' '+state : '');
+  if(lbl) lbl.textContent = txt;
+}
+
+function loadPrices(){
+  liveP = {};
+  setStatus('spin','Consultando tipo de cambio MEP...');
+
+  // Step 1: fetch MEP
+  var mepProm = fetch('https://dolarito.ar/api/v2/mep')
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var v = j.sell || j.buy || j.price || (j.data && (j.data.sell || j.data.venta)) || null;
+      return v ? parseFloat(v) : null;
+    })
+    .catch(function(){ return null; });
+
+  // Fallback MEP source
+  var mepFallback = fetch('https://api.bluelytics.com.ar/v2/latest')
+    .then(function(r){ return r.json(); })
+    .then(function(j){ return j.oficial && j.oficial.value_sell ? parseFloat(j.oficial.value_sell) : null; })
+    .catch(function(){ return null; });
+
+  mepProm.then(function(v){
+    return v ? v : mepFallback;
+  }).then(function(mep){
+    mepVal = mep || 1450;
+    setStatus('spin','MEP $'+Math.round(mepVal)+' — consultando Yahoo Finance...');
+
+    // Step 2: collect yahoo tickers
+    var yahooList = [];
+    HELD.forEach(function(r){
+      var m = TMAP[r.ticker];
+      if(m && m.yahoo) yahooList.push(m.yahoo);
+    });
+
+    // Step 3: collect byma tickers
+    var bymaList = [];
+    HELD.forEach(function(r){
+      var m = TMAP[r.ticker];
+      if(m && m.byma) bymaList.push({local:r.ticker, sym:m.byma});
+    });
+
+    // Yahoo fetch via allorigins
+    var yUrl = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols='+encodeURIComponent(yahooList.join(','))+'&fields=regularMarketPrice';
+    var yProxy = 'https://api.allorigins.win/get?url='+encodeURIComponent(yUrl);
+
+    var pYahoo = fetch(yProxy)
+      .then(function(r){ return r.json(); })
+      .then(function(raw){
+        var body = JSON.parse(raw.contents);
+        var out = {};
+        var results = (body.quoteResponse && body.quoteResponse.result) || [];
+        results.forEach(function(q){ out[q.symbol] = q.regularMarketPrice; });
+        return out;
+      })
+      .catch(function(e){ console.warn('Yahoo error:',e); return {}; });
+
+    // BYMA: fetch each bond individually
+    var pByma = Promise.all(bymaList.map(function(item){
+      var bUrl = 'https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/bnown/securities/bonds?limit=10&page=0&q='+encodeURIComponent(item.sym);
+      var bProxy = 'https://api.allorigins.win/get?url='+encodeURIComponent(bUrl);
+      return fetch(bProxy)
+        .then(function(r){ return r.json(); })
+        .then(function(raw){
+          var body = JSON.parse(raw.contents);
+          var items = body.data || body.content || (Array.isArray(body)?body:[]);
+          var match = items.find(function(i){ return (i.symbol||i.ticker||'').toUpperCase()===item.sym.toUpperCase(); });
+          if(!match && items.length>0) match=items[0];
+          if(match){
+            var p = parseFloat(match.last || match.price || match.trade || 0);
+            if(p>0) liveP[item.local] = p;
+          }
+        })
+        .catch(function(e){ console.warn('BYMA error '+item.sym+':',e); });
+    }));
+
+    Promise.all([pYahoo, pByma]).then(function(res){
+      var yRes = res[0];
+      // Map yahoo -> USD
+      HELD.forEach(function(r){
+        var m = TMAP[r.ticker];
+        if(!m) return;
+        if(m.yahoo && yRes[m.yahoo]){
+          liveP[r.ticker] = yRes[m.yahoo] / mepVal;
+        }
+        if((m.cat==='on_usd'||m.cat==='fondo') && r.cantidad>0){
+          liveP[r.ticker] = r.costo_usd / r.cantidad;
+        }
+      });
+      var n = Object.keys(liveP).length;
+      setStatus('ok','MEP $'+Math.round(mepVal)+' | '+n+'/28 precios obtenidos');
+      renderCartera();
+    });
+  }).catch(function(e){ setStatus('err','Error: '+e.message); });
+}
+
+function renderCartera(){
+  var rows = HELD.map(function(r){
+    var m    = TMAP[r.ticker] || {};
+    var pMkt = liveP[r.ticker] || null;
+    var pCmp = r.cantidad>0 ? r.costo_usd/r.cantidad : 0;
+    var vMkt = pMkt ? pMkt*r.cantidad : null;
+    var pnl  = vMkt!==null ? vMkt-r.costo_usd : null;
+    var pnlP = pnl!==null && r.costo_usd>0 ? pnl/r.costo_usd*100 : null;
+    var src  = m.yahoo ? 'Yahoo/MEP' : m.byma ? 'BYMA' : 'Costo';
+    return {r:r, pCmp:pCmp, pMkt:pMkt, vMkt:vMkt, pnl:pnl, pnlP:pnlP, src:src};
+  });
+
+  var totMkt  = rows.reduce(function(s,x){ return s+(x.vMkt||x.r.costo_usd); },0);
+  var totCst  = rows.reduce(function(s,x){ return s+x.r.costo_usd; },0);
+  var totPnl  = rows.reduce(function(s,x){ return s+(x.pnl||0); },0);
+  var nFetch  = rows.filter(function(x){ return x.pMkt && x.src!=='Costo'; }).length;
+
+  document.getElementById('cMkt').textContent  = u2(totMkt);
+  document.getElementById('cCst').textContent  = u2(totCst);
+  var ep = document.getElementById('cPnl');
+  ep.textContent = usd(totPnl);
+  ep.className   = 'kv '+cls(totPnl);
+  document.getElementById('cPnlP').textContent = pct(totCst>0?totPnl/totCst*100:0);
+  document.getElementById('cCob').textContent  = nFetch+'/28';
+
+  rows.sort(function(a,b){ return (b.vMkt||b.r.costo_usd)-(a.vMkt||a.r.costo_usd); });
+
+  document.getElementById('bCart').innerHTML = rows.map(function(x){
+    var r  = x.r;
+    var pp = totMkt>0 ? ((x.vMkt||r.costo_usd)/totMkt*100).toFixed(1) : '0';
+    var mktCell = (x.pMkt && x.src!=='Costo')
+      ? u2(x.pMkt)
+      : '<span style="color:var(--muted2)">@ costo</span>';
+    return '<tr>'+
+      '<td><b>'+r.ticker+'</b></td>'+
+      '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;font-size:.68rem">'+r.desc+'</td>'+
+      '<td>'+badge(r.tipo)+'</td>'+
+      '<td class="r">'+r.cantidad.toFixed(0)+'</td>'+
+      '<td class="r">'+u2(x.pCmp)+'</td>'+
+      '<td class="r">'+mktCell+'</td>'+
+      '<td class="r">'+u2(r.costo_usd)+'</td>'+
+      '<td class="r neu"><b>'+u2(x.vMkt||r.costo_usd)+'</b></td>'+
+      '<td class="r '+(x.pnl!==null?cls(x.pnl):'')+'">'+( x.pnl!==null?usd(x.pnl):'—')+'</td>'+
+      '<td class="r '+(x.pnlP!==null?cls(x.pnlP):'')+'">'+( x.pnlP!==null?pct(x.pnlP):'—')+'</td>'+
+      '<td class="r" style="color:var(--muted)">'+pp+'%</td>'+
+      '<td style="font-size:.62rem;color:var(--muted2)">'+x.src+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+// Init tables
+rTick();
+rTrades();
+
+</script>
+</body>
+</html>
